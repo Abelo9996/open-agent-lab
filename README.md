@@ -2,6 +2,12 @@
 
 [![ci](https://github.com/Abelo9996/open-agent-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Abelo9996/open-agent-lab/actions/workflows/ci.yml) [![pages](https://github.com/Abelo9996/open-agent-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/Abelo9996/open-agent-lab/actions/workflows/pages.yml)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/results-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/results-light.png">
+  <img alt="The open agent lab results page, showing the pilot result set for Claude Code and Codex CLI (10 tasks x 3 runs) and its setup table" src="docs/results-light.png">
+</picture>
+
 An independent, reproducible evaluation lab for coding agents (Claude Code, Codex CLI,
 OpenCode, DeepSeek Harness and others). It reruns the same coding tasks many times per
 agent, model and CLI version, and publishes pass rates with confidence intervals,
