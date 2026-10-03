@@ -29,7 +29,8 @@ JSON file under [`data/`](data/).
 | `data/tasks.json` | The task suite (ids, titles, tags, timeouts), copied from rerun-bench. |
 | `scripts/build.mjs` | Builds `_site/` from `data/`. No dependencies. |
 | `scripts/validate.mjs` | Validates every data file. CI runs it on every pull request. |
-| `src/` | Stylesheet, the small tooltip script and the favicon, copied to `_site/assets/`. |
+| `src/` | Stylesheet, the page script (tooltips, theme, copy buttons, demo playback, chart entrance), the favicon, the tool demo recordings and still frames, and the social preview image, copied to `_site/assets/`. |
+| `scripts/social.mjs` | Renders `src/social-preview.png` (and `docs/social-preview.png`) from the latest result set with headless Chrome. |
 
 ## The tools behind it
 
@@ -42,6 +43,15 @@ JSON file under [`data/`](data/).
   report contains.
 - [snap-back](https://github.com/Abelo9996/snap-back): undo for any coding agent.
 - [agent-fence](https://github.com/Abelo9996/agent-fence): one permission policy for any agent.
+- [launch-day-kit](https://github.com/Abelo9996/launch-day-kit): playbook, templates and a
+  scaffolder for shipping a companion repo within hours of a platform launch.
+
+Each tool has a section on the home page with its install command and a terminal recording,
+linked by name: [#nerf-watch](https://abelo9996.github.io/open-agent-lab/#nerf-watch),
+[#rerun-bench](https://abelo9996.github.io/open-agent-lab/#rerun-bench),
+[#snap-back](https://abelo9996.github.io/open-agent-lab/#snap-back),
+[#agent-fence](https://abelo9996.github.io/open-agent-lab/#agent-fence),
+[#launch-day-kit](https://abelo9996.github.io/open-agent-lab/#launch-day-kit).
 
 ## Add a result set
 
@@ -65,7 +75,11 @@ npm run validate   # check data/
 npm test           # tests for the validator
 npm run build      # write _site/
 npm run serve      # preview at http://localhost:8080/
+npm run social     # re-render the social preview image (needs Chrome)
 ```
+
+The pages work without JavaScript and with `prefers-reduced-motion: reduce`: every number,
+chart mark and demo still frame is final in the HTML, and animation is layered on top.
 
 ## How results are presented
 

@@ -55,6 +55,10 @@ function tableView(caption, head, rows) {
 
 const PCT_TICKS = [0, 0.25, 0.5, 0.75, 1];
 
+// Where the estimate sits inside its interval, as a share of the interval's
+// width. Marks grow out from this point when a chart animates in.
+const originPct = (est, lo, hi) => (hi > lo ? `${(((est - lo) / (hi - lo)) * 100).toFixed(1)}%` : "50%");
+
 // One row per agent: the Wilson interval as a thin bar, the estimate as a dot.
 export function intervalChart({ id, title, desc, rows, compactView = false }) {
   const H = 28;
@@ -70,7 +74,7 @@ export function intervalChart({ id, title, desc, rows, compactView = false }) {
   <div class="clabel"><span class="cname">${esc(r.label)}</span>${r.sub ? `<span class="csub">${esc(r.sub)}</span>` : ""}</div>
   <svg class="ctrack" height="${H}" width="100%" overflow="visible" aria-hidden="true" focusable="false">
     ${gridLines(PCT_TICKS, H)}
-    <rect class="ci s1" x="${P(r.lo)}" y="${H / 2 - 3}" width="${P(w)}" height="6" rx="3" />
+    <rect class="ci s1" x="${P(r.lo)}" y="${H / 2 - 3}" width="${P(w)}" height="6" rx="3" style="transform-origin:${originPct(r.est, r.lo, r.hi)} 50%" />
     <circle class="est s1" cx="${P(r.est)}" cy="${H / 2}" r="5" />
   </svg>
   <div class="cvalue"><strong>${pct(r.est)}</strong> <span>${ci([r.lo, r.hi])}</span></div>
@@ -172,7 +176,7 @@ export function rangeChart({ id, title, desc, series, rows, fmt = compact, unit 
         .map((v, i) => {
           if (!v || v.median == null) return "";
           const y = 5 + i * 10 + 5;
-          return `<line class="rng s${i + 1}" x1="${x(v.min)}" x2="${x(v.max)}" y1="${y}" y2="${y}" />${marker(SHAPES[i], `mk s${i + 1}`, x(v.median), y, 4)}`;
+          return `<line class="rng s${i + 1}" x1="${x(v.min)}" x2="${x(v.max)}" y1="${y}" y2="${y}" style="transform-origin:${originPct(v.median, v.min, v.max)} 50%" />${marker(SHAPES[i], `mk s${i + 1}`, x(v.median), y, 4)}`;
         })
         .join("");
       const tipLines = r.values.map((v, i) =>

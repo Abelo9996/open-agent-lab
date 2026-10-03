@@ -28,6 +28,9 @@ const outArg = process.argv.indexOf("--out");
 const OUT = join(root, outArg > -1 ? process.argv[outArg + 1] : "_site");
 // Absolute base path, only used by 404.html (served at arbitrary depths).
 const BASE = process.env.SITE_BASE || "/open-agent-lab/";
+// Absolute site URL, used for canonical links and social preview meta tags.
+const SITE_URL = process.env.SITE_URL || "https://abelo9996.github.io/open-agent-lab/";
+const SOCIAL_IMAGE = `${SITE_URL}assets/social-preview.png`;
 
 const REPO = "https://github.com/Abelo9996/open-agent-lab";
 const GH = "https://github.com/Abelo9996";
@@ -37,6 +40,7 @@ const TOOLS = {
   nerfWatch: `${GH}/nerf-watch`,
   snapBack: `${GH}/snap-back`,
   agentFence: `${GH}/agent-fence`,
+  launchDayKit: `${GH}/launch-day-kit`,
 };
 const ISSUE_FORM = `${REPO}/issues/new?template=regression-report.yml`;
 
@@ -73,6 +77,12 @@ const NAV = [
 
 const mark = `<svg class="logo" width="28" height="20" viewBox="0 0 28 20" aria-hidden="true" focusable="false"><rect x="1" y="6" width="4" height="13" rx="1"/><rect x="8" y="2" width="4" height="17" rx="1"/><rect x="15" y="8" width="4" height="11" rx="1"/><rect x="22" y="2" width="4" height="17" rx="1" class="logo-hi"/></svg>`;
 
+// Runs before first paint: applies a stored theme choice and marks that
+// scripts are available, so script-only controls never show without them.
+const HEAD_SCRIPT = `(function(){var d=document.documentElement;d.classList.add("js");try{var t=localStorage.getItem("oal-theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})();`;
+
+const themeIcon = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg>`;
+
 function layout({ path, title, description, body, absolute = false }) {
   const depth = path === "" ? 0 : path.split("/").filter(Boolean).length;
   const pre = absolute ? BASE : depth ? "../".repeat(depth) : "./";
@@ -81,6 +91,7 @@ function layout({ path, title, description, body, absolute = false }) {
     return `<li><a href="${pre}${href}"${cur}>${esc(label)}</a></li>`;
   }).join("");
   const fullTitle = path === "" ? "open agent lab" : `${title} | open agent lab`;
+  const url = absolute ? SITE_URL : `${SITE_URL}${path}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -89,16 +100,33 @@ function layout({ path, title, description, body, absolute = false }) {
 <meta name="color-scheme" content="light dark">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
+${absolute ? "" : `<link rel="canonical" href="${esc(url)}">\n`}<meta property="og:type" content="website">
+<meta property="og:site_name" content="open agent lab">
+<meta property="og:title" content="${esc(fullTitle)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:image" content="${esc(SOCIAL_IMAGE)}">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="open agent lab: coding agents, measured more than once. A pass and fail grid of repeated runs per task.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(fullTitle)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image" content="${esc(SOCIAL_IMAGE)}">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fcfdfc">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#151b1a">
 <link rel="icon" href="${pre}assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="${pre}assets/style.css">
+<script>${HEAD_SCRIPT}</script>
 <script src="${pre}assets/site.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="site-header">
+<header class="site-header" id="top">
   <div class="wrap header-inner">
     <a class="brand" href="${pre}">${mark}<span>open agent lab</span></a>
     <nav aria-label="Main"><ul>${nav}</ul></nav>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Color theme: follows system">${themeIcon}<span class="theme-label">auto</span></button>
   </div>
   <div class="ruler" aria-hidden="true"></div>
 </header>
@@ -112,6 +140,7 @@ ${body}
   </div>
 </footer>
 <div class="tip" role="tooltip" id="tip" hidden></div>
+<p class="sr-only" aria-live="polite" id="live"></p>
 </body>
 </html>
 `;
@@ -337,6 +366,166 @@ ${body}`,
 
 // ---------------------------------------------------------------- home
 
+// The hero instrument: every run of the latest result set as a pass/fail
+// cell. The finished grid is the HTML; the fill-in is a CSS animation layered
+// on top, ordered the way rerun-bench schedules runs (run 0 of every task,
+// then run 1, and so on).
+function heroPanel(r) {
+  const es = r.entries.slice().sort(byName);
+  const taskIds = [...new Set(es.flatMap((e) => Object.keys(e.metrics.per_task)))].sort();
+  const runs = Math.max(...es.flatMap((e) => Object.values(e.metrics.per_task).map((t) => t.n)));
+  const nT = taskIds.length;
+  const total = runs * nT;
+  const head1 = es
+    .map((e, ai) => `${ai ? '<td class="gap"></td>' : ""}<th scope="colgroup" colspan="${runs}" class="hg-agent">${esc(agentName(e.agent))}</th>`)
+    .join("");
+  const head2 = es
+    .map(
+      (e, ai) =>
+        `${ai ? '<td class="gap"></td>' : ""}` +
+        Array.from({ length: runs }, (_, i) => `<th scope="col" class="hg-run"><span class="sr-only">${esc(agentName(e.agent))} run </span>${i}</th>`).join(""),
+    )
+    .join("");
+  const rows = taskIds
+    .map((t, ti) => {
+      const cells = es
+        .map((e, ai) => {
+          const out = e.metrics.per_task[t]?.outcomes || [];
+          return (
+            `${ai ? '<td class="gap"></td>' : ""}` +
+            Array.from({ length: runs }, (_, ri) => {
+              const o = out[ri];
+              if (o === undefined) return `<td><span class="hg-cell na"><span class="sr-only">no run</span></span></td>`;
+              const word = o ? "pass" : "fail";
+              // Interleaved order; the second agent trails by half a step.
+              const i = ri * nT + ti + ai * 0.5;
+              return `<td><span class="hg-cell run-mark ${word}" style="--i:${i}" data-agent="${ai}" data-tip="${esc(
+                `${word}\n${agentName(e.agent)}, ${t}, run ${ri}`,
+              )}"><span aria-hidden="true">${o ? "&#10003;" : "&#10005;"}</span><span class="sr-only">${word}</span></span></td>`;
+            }).join("")
+          );
+        })
+        .join("");
+      return `<tr><th scope="row" class="hg-task">${esc(t)}</th>${cells}</tr>`;
+    })
+    .join("\n");
+  const tallies = es
+    .map(
+      (e, ai) => `<div class="hg-tally">
+  <dt>${esc(agentName(e.agent))}</dt>
+  <dd><span class="hg-num"><span data-count-agent="${ai}">${e.metrics.passes}</span>/${e.metrics.n_runs}</span> passed <span class="hg-ci">95% ${ci(e.metrics.pass_rate_ci95)}</span></dd>
+</div>`,
+    )
+    .join("");
+  return `<figure class="instrument" aria-labelledby="hg-title" data-total="${total}">
+  <div class="inst-bar">
+    <span class="inst-light" aria-hidden="true"></span>
+    <span class="mono inst-name" id="hg-title">rerun-bench ${esc(r.rerun_bench_version)} &middot; ${esc(r.date)}${r.lab.pilot ? " pilot" : ""}</span>
+    <button type="button" class="inst-replay" data-replay hidden>Replay runs</button>
+  </div>
+  <div class="tablewrap"><table class="hgrid" data-run="a">
+    <caption class="sr-only">Every run of the latest result set: ${nT} tasks, ${runs} runs per task for each agent</caption>
+    <thead><tr><td></td>${head1}</tr><tr><td class="hg-runlabel" aria-hidden="true">run</td>${head2}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>
+  <dl class="hg-tallies">${tallies}</dl>
+  <figcaption class="inst-cap">Each square is one run of one task, scored only by the task's verifier. <span class="run-mark pass mini" aria-hidden="true">&#10003;</span> pass <span class="run-mark fail mini" aria-hidden="true">&#10005;</span> fail. ${r.lab.pilot ? `Pilot, n=${runs} per task.` : `n=${runs} per task.`}</figcaption>
+</figure>`;
+}
+
+const TOOL_LIST = [
+  {
+    id: "nerf-watch",
+    kind: "Regression detection",
+    url: TOOLS.nerfWatch,
+    outcome: "Find out when your coding agent quietly got worse or more expensive.",
+    install: "npx github:Abelo9996/nerf-watch check",
+    facts: [
+      "Reads the session logs Claude Code and Codex already write on your machine. Nothing is uploaded.",
+      "Flags a different model answering than the one you picked, reasoning effort drops, a shrinking context window, cache-write jumps and failing tool calls.",
+      "<code>check</code> exits with status 1 when an alert fires; <code>report</code> writes an anonymized, shareable summary.",
+    ],
+    role: "Its anonymized report is what a regression report on this site contains.",
+    demo: { w: 1200, h: 700, cmd: "nerf-watch check", alt: "nerf-watch check run on synthetic Claude Code logs, flagging a silent model swap from claude-opus-5 to claude-sonnet-5, a cache-write jump and a cache hit rate collapse after a CLI update" },
+  },
+  {
+    id: "rerun-bench",
+    kind: "Repeated-run benchmark",
+    url: TOOLS.rerunBench,
+    outcome: "Run the same coding task N times per agent and see how often it passes, how often it flips, and how much the bill varies.",
+    install: "uv tool install git+https://github.com/Abelo9996/rerun-bench",
+    facts: [
+      "Each run starts from a fresh temporary copy of the task, and passes only if the task's verifier exits 0.",
+      "Reports pass rate with a Wilson 95% interval, pass^k, flip rate, and cost and token spread.",
+      "Drives Claude Code, Codex CLI and OpenCode headlessly; a free mock agent shows the whole pipeline without spending anything.",
+    ],
+    role: "Produces every result on this site.",
+    demo: { w: 1200, h: 700, cmd: "rerun-bench run --agent mock", alt: "rerun-bench running the free mock agent 5 times on each of 10 tasks, then printing each task's pass and fail sequence, pass rate, flip rate and cost spread" },
+  },
+  {
+    id: "snap-back",
+    kind: "Undo",
+    url: TOOLS.snapBack,
+    outcome: "Roll back whatever a coding agent did to your files with one command, without touching your own git history.",
+    install: "npm install -g github:Abelo9996/snap-back",
+    facts: [
+      "Snapshots the project into a separate shadow git repository; your own <code>.git</code> is never read or written.",
+      "Works with any agent, because it watches files rather than the agent.",
+      "<code>undo</code> lists what it will restore and delete and asks first, and every restore can itself be undone.",
+    ],
+    role: "Lets you try an agent update without risking your working tree.",
+    demo: { w: 1240, h: 700, cmd: "snap-back undo", alt: "snap-back wrapping an agent-like script that deletes two files and rewrites a third, then snap-back undo restoring all three" },
+  },
+  {
+    id: "agent-fence",
+    kind: "Permission policy",
+    url: TOOLS.agentFence,
+    outcome: "One policy file decides what every coding agent on your machine may run, read and write, and logs everything it tried.",
+    install: "npm install -g github:Abelo9996/agent-fence",
+    facts: [
+      "Allow, ask or deny shell commands, file access and git operations from one <code>.agent-fence.toml</code>.",
+      "Claude Code and Codex enforce it through their hooks; any other agent can run its commands through a wrapper.",
+      "Every decision goes to a local audit log, and <code>agent-fence test</code> unit-tests the policy in CI.",
+    ],
+    role: "Keeps benchmark and everyday runs inside rules you can read and test.",
+    demo: { w: 1400, h: 600, cmd: "agent-fence check", alt: "agent-fence check denying \"cd app && git push --force\" and \"cat .env\" with the matching rule and reason, and allowing \"npm test\"" },
+  },
+  {
+    id: "launch-day-kit",
+    kind: "Launch tooling",
+    url: TOOLS.launchDayKit,
+    outcome: "Ship a companion repo within hours of an AI platform launch.",
+    install: "git clone https://github.com/Abelo9996/launch-day-kit",
+    facts: [
+      "A playbook with a T-minus and T-plus checklist, naming rules and a README pattern.",
+      "Five tested templates: awesome-list, terminal UI, desktop app, plugin market and model router.",
+      "A zero-dependency scaffolder fills placeholders and commits; <code>npm run rehearse</code> times every template end to end.",
+    ],
+    role: "Works to the same clock as the launch-day plan on this site: hours, not weeks.",
+    demo: { w: 1300, h: 700, cmd: "node bin/new-launch.mjs", alt: "launch-day-kit scaffolding a model-router repo for a fake platform, then installing it and passing all 10 of its tests in seconds" },
+  },
+];
+
+function toolSection(t, i) {
+  const n = `3.${i + 1}`;
+  return `<section class="toolsec${i % 2 ? " flip" : ""}" id="${t.id}" aria-labelledby="${t.id}-h">
+  <div class="toolsec-text">
+    <p class="eyebrow"><span class="mono">${n}</span> ${esc(t.kind)}</p>
+    <h3 id="${t.id}-h" class="tool-name"><a class="anchor" href="#${t.id}"><span class="mono">${t.id}</span><span class="anchor-mark" aria-hidden="true">#</span></a></h3>
+    <p class="outcome">${esc(t.outcome)}</p>
+    <div class="cmd"><pre><code>${esc(t.install)}</code></pre><button type="button" class="copy" data-copy hidden>Copy</button></div>
+    <ul class="facts">${t.facts.map((f) => `<li>${f}</li>`).join("")}</ul>
+    <p class="tool-role">${esc(t.role)}</p>
+    <p class="tool-links"><a class="go" href="${t.url}">Repository</a> <a class="go" href="${t.url}/blob/main/README.md">README</a></p>
+  </div>
+  <figure class="demo">
+    <div class="demo-bar"><span class="mono">$ ${esc(t.demo.cmd)}</span><button type="button" class="demo-toggle" data-demo-toggle hidden aria-pressed="false">Pause</button></div>
+    <div class="demo-frame" style="aspect-ratio:${t.demo.w} / ${t.demo.h}"><img src="assets/demos/${t.id}.webp" data-gif="assets/demos/${t.id}.gif" width="${t.demo.w}" height="${t.demo.h}" loading="lazy" decoding="async" alt="${esc(t.demo.alt)}"></div>
+    <figcaption class="small">Terminal recording from the repository. Still frame shown until it loads. <a href="assets/demos/${t.id}.gif">Open the animated demo</a>.</figcaption>
+  </figure>
+</section>`;
+}
+
 function homePage() {
   const latest = data.results[0];
   let latestBlock = `<div class="empty"><p class="empty-title">No results published yet.</p></div>`;
@@ -382,30 +571,19 @@ function homePage() {
 </div>`;
   }
 
-  const tools = [
-    ["rerun-bench", TOOLS.rerunBench, "Runs the same tasks N times per agent and reports pass rate with a Wilson interval, pass^k, flip rate, and cost and token spread.", "Produces every result on this site."],
-    ["nerf-watch", TOOLS.nerfWatch, "Reads the session logs Claude Code and Codex already write and flags silent changes in model, reasoning effort, tokens and cost. Runs locally.", "Its anonymized report is what a regression report contains."],
-    ["snap-back", TOOLS.snapBack, "Undo for any coding agent. Snapshots the project in a shadow git repo so one command rolls back what the agent did.", "Lets you try an agent update without risking your working tree."],
-    ["agent-fence", TOOLS.agentFence, "One permission policy for any coding agent: allow, ask or deny shell commands, file access and git operations, with an audit log of every decision. Hooks for Claude Code and Codex.", "Keeps benchmark and everyday runs inside rules you can read and test."],
-  ]
-    .map(
-      ([name, url, what, role]) => `<li class="tool">
-  <h3><a href="${url}"><span class="mono">${name}</span></a></h3>
-  <p>${esc(what)}</p>
-  <p class="tool-role">${esc(role)}</p>
-</li>`,
-    )
-    .join("");
-
   return layout({
     path: "",
     title: "Home",
     description: "Independent, reproducible evaluation of coding agents. Same tasks, many runs, intervals shown.",
     body: `<section class="hero">
-  <p class="eyebrow"><span class="mono">01</span> open agent lab</p>
-  <h1>Coding agents, measured more than once.</h1>
-  <p class="lede">An independent lab that reruns the same coding tasks many times per agent, model and CLI version, and publishes how often each run passes, how often results flip, and what each run costs, with the uncertainty shown.</p>
-  <p class="hero-links"><a class="button" href="results/">See results</a> <a class="button ghost" href="methodology/">How runs are scored</a></p>
+  <div class="hero-text">
+    <p class="eyebrow"><span class="mono">01</span> open agent lab</p>
+    <h1>Coding agents, measured more than once.</h1>
+    <p class="lede">An independent lab that reruns the same coding tasks many times per agent, model and CLI version, and publishes how often each run passes, how often results flip, and what each run costs, with the uncertainty shown.</p>
+    <p class="hero-links"><a class="button" href="results/">See results</a> <a class="button ghost" href="methodology/">How runs are scored</a></p>
+    <ul class="jump" aria-label="Tools">${TOOL_LIST.map((t) => `<li><a href="#${t.id}" class="mono">${t.id}</a></li>`).join("")}</ul>
+  </div>
+  ${latest ? heroPanel(latest) : ""}
 </section>
 
 <section aria-labelledby="latest">
@@ -413,10 +591,10 @@ function homePage() {
   ${latestBlock}
 </section>
 
-<section aria-labelledby="tools">
+<section aria-labelledby="tools" class="tools-wrap">
   ${sectionHead("03", "Tools", "The tools behind the lab", "tools")}
-  <p>All four are open source and run on your own machine.</p>
-  <ul class="tools">${tools}</ul>
+  <p>All five are open source and run on your own machine. Each section has a stable link, such as <a class="nowrap" href="#nerf-watch">#nerf-watch</a>.</p>
+  ${TOOL_LIST.map(toolSection).join("\n")}
 </section>
 
 <section aria-labelledby="contribute">
@@ -611,6 +789,7 @@ function regressionsPage() {
     <li>cache writes per turn jumped, or the cache hit rate collapsed, after a CLI update;</li>
     <li>tool calls started failing more often.</li>
   </ul>
+  <p>Install command and a terminal recording: <a href="../#nerf-watch">nerf-watch on the home page</a>.</p>
   <p>Everything runs locally. <code>nerf-watch report</code> writes aggregate numbers only: token medians, rates, CLI versions, model ids, dates and counts. It contains no prompts, responses, tool output, file paths, project names or session ids. Read it before you share it.</p>
 </section>
 
@@ -672,6 +851,7 @@ function launchesPage() {
     <li><span class="mono t">by T+24 h</span><div><strong>Publish.</strong> The report goes into <code>data/results/</code> with <code>lab.launch</code> set, run records and diffs are linked, and the publication time is recorded below.</div></li>
   </ol>
   <p>If 24 hours is not enough to finish the runs, the result set is published late and the delay is shown. Launch-day numbers follow the same rules as every other result: intervals shown, no ranking when they overlap.</p>
+  <p>For shipping a companion repository on the same clock, see <a href="../#launch-day-kit">launch-day-kit</a>.</p>
 </section>
 
 <section aria-labelledby="l-list">
@@ -708,8 +888,6 @@ write("launches/index.html", launchesPage());
 write("404.html", notFoundPage());
 write(".nojekyll", "");
 
-mkdirSync(join(OUT, "assets"), { recursive: true });
-for (const f of readdirSync(join(root, "src"))) copyFileSync(join(root, "src", f), join(OUT, "assets", f));
 const copyDir = (from, to) => {
   mkdirSync(to, { recursive: true });
   for (const f of readdirSync(from, { withFileTypes: true })) {
@@ -718,6 +896,7 @@ const copyDir = (from, to) => {
     else copyFileSync(join(from, f.name), join(to, f.name));
   }
 };
+copyDir(join(root, "src"), join(OUT, "assets"));
 if (existsSync(join(root, "data"))) copyDir(join(root, "data"), join(OUT, "data"));
 
 console.log(`built ${OUT.replace(root + "/", "")}: 6 pages, ${data.results.length} result set(s)`);

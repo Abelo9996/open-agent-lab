@@ -2,6 +2,21 @@
 
 All notable changes to this project are listed here. Dates are UTC.
 
+## Unreleased
+
+- Home page: a hero that shows every run of the latest result set as a pass/fail grid, filled
+  in run order on load, with pass counts that follow the grid and a replay control.
+- Home page: one section per tool (nerf-watch, rerun-bench, snap-back, agent-fence,
+  launch-day-kit) with stable anchors, install command with a copy button, three facts, links,
+  and the terminal recording (still frame first, GIF while on screen, pause control).
+- Sticky header with a scroll shadow, a scroll-position needle on the ruler, and a light,
+  dark or system theme control.
+- Hover and focus states on links, buttons, cards, chart rows and grid cells; chart marks grow
+  in from their estimate when first scrolled into view; cross-page view transitions.
+- All motion is off under `prefers-reduced-motion: reduce`; pages are complete without scripts.
+- Open Graph and Twitter card tags on every page and a 1280x640 social preview image
+  rendered by `scripts/social.mjs`.
+
 ## 0.1.0 (2026-10-03)
 
 First public version.
