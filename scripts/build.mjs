@@ -439,7 +439,7 @@ const TOOL_LIST = [
     kind: "Regression detection",
     url: TOOLS.nerfWatch,
     outcome: "Find out when your coding agent quietly got worse or more expensive.",
-    install: "npx github:Abelo9996/nerf-watch check",
+    install: "npx nerf-watch check",
     facts: [
       "Reads the session logs Claude Code and Codex already write on your machine. Nothing is uploaded.",
       "Flags a different model answering than the one you picked, reasoning effort drops, a shrinking context window, cache-write jumps and failing tool calls.",
@@ -467,7 +467,7 @@ const TOOL_LIST = [
     kind: "Undo",
     url: TOOLS.snapBack,
     outcome: "Roll back whatever a coding agent did to your files with one command, without touching your own git history.",
-    install: "npm install -g github:Abelo9996/snap-back",
+    install: "npm install -g @abelo9996/snap-back",
     facts: [
       "Snapshots the project into a separate shadow git repository; your own <code>.git</code> is never read or written.",
       "Works with any agent, because it watches files rather than the agent.",
@@ -481,7 +481,7 @@ const TOOL_LIST = [
     kind: "Permission policy",
     url: TOOLS.agentFence,
     outcome: "One policy file decides what every coding agent on your machine may run, read and write, and logs everything it tried.",
-    install: "npm install -g github:Abelo9996/agent-fence",
+    install: "npm install -g @abelo9996/agent-fence",
     facts: [
       "Allow, ask or deny shell commands, file access and git operations from one <code>.agent-fence.toml</code>.",
       "Claude Code and Codex enforce it through their hooks; any other agent can run its commands through a wrapper.",
@@ -611,7 +611,7 @@ function homePage() {
     <div class="col">
       <h3>Regression reports</h3>
       <ol class="steps">
-        <li>Run <code>npx github:Abelo9996/nerf-watch report --json --out nerf-watch-report.json</code>.</li>
+        <li>Run <code>npx nerf-watch report --json --out nerf-watch-report.json</code>.</li>
         <li>Read the report. It holds aggregate numbers only.</li>
         <li><a href="${ISSUE_FORM}">Open a regression report</a> and paste it in.</li>
       </ol>
@@ -796,7 +796,7 @@ function regressionsPage() {
 <section aria-labelledby="g-how">
   ${sectionHead("4.2", "Report", "How to report", "g-how")}
   <ol class="steps">
-    <li>Run <code>npx github:Abelo9996/nerf-watch report --json --out nerf-watch-report.json</code> (Node.js 20 or newer).</li>
+    <li>Run <code>npx nerf-watch report --json --out nerf-watch-report.json</code> (Node.js 20 or newer).</li>
     <li>Open the file and check that it contains nothing you do not want to publish. The issue is public.</li>
     <li><a href="${ISSUE_FORM}">Open a regression report</a>, paste the JSON, and fill in the agent, CLI versions and model.</li>
   </ol>
