@@ -649,7 +649,7 @@ function launchesPage() {
         )
         .join("")}</tbody></table></div>`
     : `<div class="empty">
-  <svg class="empty-art" viewBox="0 0 240 64" aria-hidden="true" focusable="false"><line x1="0" y1="40" x2="240" y2="40" class="empty-base"/>${Array.from({ length: 25 }, (_, i) => `<line x1="${i * 10}" x2="${i * 10}" y1="${i % 6 === 0 ? 30 : 35}" y2="40" class="empty-tick"/>`).join("")}<circle cx="0" cy="40" r="4" class="empty-dot"/></svg>
+  <svg class="empty-art" viewBox="0 0 240 64" aria-hidden="true" focusable="false"><line x1="0" y1="40" x2="240" y2="40" class="empty-base"/>${Array.from({ length: 24 }, (_, i) => `<line x1="${6 + i * 10}" x2="${6 + i * 10}" y1="${i % 6 === 0 ? 30 : 35}" y2="40" class="empty-tick"/>`).join("")}<circle cx="6" cy="40" r="4" class="empty-dot"/></svg>
   <p class="empty-title">No launch-day results yet.</p>
   <p>The first one will appear here after the next major model launch, with the time from announcement to publication.</p>
 </div>`;
