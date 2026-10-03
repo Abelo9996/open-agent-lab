@@ -386,7 +386,7 @@ function homePage() {
     ["rerun-bench", TOOLS.rerunBench, "Runs the same tasks N times per agent and reports pass rate with a Wilson interval, pass^k, flip rate, and cost and token spread.", "Produces every result on this site."],
     ["nerf-watch", TOOLS.nerfWatch, "Reads the session logs Claude Code and Codex already write and flags silent changes in model, reasoning effort, tokens and cost. Runs locally.", "Its anonymized report is what a regression report contains."],
     ["snap-back", TOOLS.snapBack, "Undo for any coding agent. Snapshots the project in a shadow git repo so one command rolls back what the agent did.", "Lets you try an agent update without risking your working tree."],
-    ["agent-fence", TOOLS.agentFence, "One permission policy for any agent.", "In progress."],
+    ["agent-fence", TOOLS.agentFence, "One permission policy for any coding agent: allow, ask or deny shell commands, file access and git operations, with an audit log of every decision. Hooks for Claude Code and Codex.", "Keeps benchmark and everyday runs inside rules you can read and test."],
   ]
     .map(
       ([name, url, what, role]) => `<li class="tool">
