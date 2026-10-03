@@ -4,6 +4,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
+import { SIGNAL_EFFECT_UNIT } from "./regressions.mjs";
 
 export const RESULT_NAME = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.json$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -302,7 +303,43 @@ function validateRegressions(path, agentIds) {
       ck.str(r.issue_url, `${p}.issue_url`, { pattern: HTTPS });
     });
   }
-  return { errors: ck.errors, reports: doc.reports || [] };
+  // Written by scripts/aggregate-regressions.mjs from open regression-report issues.
+  const aggregates = doc.aggregates === undefined ? [] : doc.aggregates;
+  if (ck.isArr(aggregates, "aggregates")) {
+    const SAFE = /^[A-Za-z0-9][A-Za-z0-9_.+\-\[\]]{0,79}$/;
+    const ISSUE = /^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\/issues\/[1-9]\d*$/;
+    const keys = new Set();
+    aggregates.forEach((a, i) => {
+      const p = `aggregates[${i}]`;
+      if (!ck.isObj(a, p)) return;
+      ck.str(a.agent, `${p}.agent`, { pattern: /^[a-z][a-z0-9-]{0,31}$/ });
+      ck.str(a.cli_version, `${p}.cli_version`, { pattern: SAFE });
+      ck.str(a.model, `${p}.model`, { pattern: SAFE });
+      ck.str(a.signal, `${p}.signal`, { oneOf: Object.keys(SIGNAL_EFFECT_UNIT) });
+      const key = `${a.agent}|${a.cli_version}|${a.model}|${a.signal}`;
+      if (keys.has(key)) ck.fail(p, "duplicate agent, CLI version, model and signal");
+      keys.add(key);
+      for (const f of ["cli_before", "served_models"]) {
+        if (ck.isArr(a[f], `${p}.${f}`)) a[f].forEach((v, j) => ck.str(v, `${p}.${f}[${j}]`, { pattern: SAFE }));
+      }
+      ck.num(a.reports, `${p}.reports`, { min: 1, int: true });
+      ck.num(a.alerts, `${p}.alerts`, { min: 0, max: a.reports ?? Infinity, int: true });
+      ck.num(a.effect_median, `${p}.effect_median`, { nullable: true, min: -1e9, max: 1e9 });
+      if (a.effect_unit !== (SIGNAL_EFFECT_UNIT[a.signal] ?? null)) ck.fail(`${p}.effect_unit`, "does not match the signal");
+      ck.str(a.first_seen, `${p}.first_seen`, { nullable: true, pattern: DATE });
+      ck.str(a.last_seen, `${p}.last_seen`, { nullable: true, pattern: DATE });
+      if (ck.isArr(a.issues, `${p}.issues`, { nonEmpty: true })) {
+        a.issues.forEach((x, j) => {
+          if (!ck.isObj(x, `${p}.issues[${j}]`)) return;
+          ck.num(x.number, `${p}.issues[${j}].number`, { min: 1, int: true });
+          if (ck.str(x.url, `${p}.issues[${j}].url`, { pattern: ISSUE }) && !x.url.endsWith(`/issues/${x.number}`)) {
+            ck.fail(`${p}.issues[${j}].url`, "does not match the issue number");
+          }
+        });
+      }
+    });
+  }
+  return { errors: ck.errors, reports: doc.reports || [], aggregates: Array.isArray(aggregates) ? aggregates : [] };
 }
 
 function validateLaunches(path, resultFiles) {
@@ -380,6 +417,7 @@ export function loadAll(root) {
       tasks: tk.tasks || { tasks: [] },
       results,
       regressions: rg.reports || [],
+      regressionAggregates: rg.aggregates || [],
       launches: ln.launches || [],
     },
   };

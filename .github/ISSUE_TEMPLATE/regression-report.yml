@@ -6,10 +6,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting. This issue is public. Generate the report with
-        `npx nerf-watch report --json --out nerf-watch-report.json`,
-        read it, and paste it below. It should contain aggregate numbers only: no prompts,
-        responses, file paths, project names or session ids.
+        Thanks for reporting. This issue is public. The easiest way to fill this in is
+        `npx nerf-watch share`: it prints the anonymized JSON and a link to this form with
+        every field but "What you observed" filled in. Read the JSON before you submit.
+        It holds aggregate numbers only: no prompts, responses, file paths, project names,
+        session ids, or user or host names.
+
+        A scheduled job validates the JSON below and adds it to the
+        [regression watch](https://abelo9996.github.io/open-agent-lab/regressions/) while this
+        issue is open. Reports that are not valid `nerf-watch share` output are skipped.
   - type: dropdown
     id: agent
     attributes:
@@ -67,7 +72,7 @@ body:
     id: report
     attributes:
       label: Anonymized nerf-watch report (JSON)
-      description: Output of `nerf-watch report --json`. Paste the whole file.
+      description: The JSON printed by `nerf-watch share`, unchanged. Edits that break the schema make the report get skipped.
       render: json
     validations:
       required: true

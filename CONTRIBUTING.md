@@ -78,15 +78,45 @@ factual: no claims beyond what the numbers show.
 
 ## Submitting a regression report
 
-1. Run `npx nerf-watch report --json --out nerf-watch-report.json`.
-2. Read the file. It should contain only aggregate numbers, CLI versions, model ids, dates
-   and counts. Remove anything you do not want public.
-3. Open a [regression report](https://github.com/Abelo9996/open-agent-lab/issues/new?template=regression-report.yml)
-   and fill in every required field: agent, CLI version before and after, model requested,
-   nerf-watch version, date first noticed, the report JSON, and what you observed.
+1. Run `npx nerf-watch share`. It prints the anonymized JSON that would be shared and a
+   link to a prefilled [regression report](https://github.com/Abelo9996/open-agent-lab/issues/new?template=regression-report.yml).
+   Add `--open` to open the link in your browser.
+2. Read the JSON. It holds only detector ids, severities, agent, model ids, CLI versions,
+   dates, sample counts and before and after values.
+3. Open the link, describe what you observed, and submit. If the JSON was too long for the
+   link, paste it into the report field yourself.
 
-A maintainer reviews the issue. Reviewed reports are added to `data/regressions.json` with
-one of these statuses:
+### How reports are aggregated
+
+The `regressions` workflow (`.github/workflows/regressions.yml`) runs daily, on manual
+dispatch, and whenever an issue with the `regression-report` label is opened, edited,
+closed, reopened, deleted or relabeled. It:
+
+1. reads open issues with that label through the GitHub API, with a read-only issues token;
+2. takes the first JSON code block in each body and validates it strictly
+   (`scripts/lib/regressions.mjs`): exact keys, known detectors and signals, anchored
+   patterns for agent ids, versions and model ids, bounded sizes and numbers, valid dates,
+   and no path-like, email-like, URL-like or markup text anywhere. Anything else is skipped
+   and the log names the issue number and the reason, never its content;
+3. groups findings by agent, CLI version (the first version showing the change), model and
+   signal, and counts independent reports as distinct GitHub accounts (one account's newest
+   issue per row). Each row has the median effect size, the dates the change was seen, and
+   links to the source issues;
+4. writes `aggregates` in `data/regressions.json`, commits only if it changed, and the pages
+   workflow publishes it.
+
+Closing an issue, or removing its label, removes it at the next run. Run the aggregator
+locally against saved API output with
+`node scripts/aggregate-regressions.mjs --issues issues.json --out /tmp/regressions.json`.
+
+Effect sizes by signal: ratios (after divided by before) for tokens, cache writes and
+context window; percentage-point changes for cache hit rate and tool error rate; levels for
+reasoning effort; the share of turns answered by another model for model rerouting.
+
+### Reviewed reports
+
+Maintainers can also add hand-reviewed entries to `reports` in `data/regressions.json`. The
+aggregator keeps them as they are. Each has one of these statuses:
 
 | Status | Meaning |
 |---|---|
@@ -94,8 +124,6 @@ one of these statuses:
 | `confirmed` | Matched by independent reports or reproduced with rerun-bench. |
 | `not-reproduced` | Could not be reproduced and no matching reports arrived. |
 | `explained` | Caused by a documented change (release notes, settings, plan change). |
-
-### regressions.json entry
 
 ```json
 {

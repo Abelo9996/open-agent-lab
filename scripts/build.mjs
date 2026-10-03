@@ -443,9 +443,9 @@ const TOOL_LIST = [
     facts: [
       "Reads the session logs Claude Code and Codex already write on your machine. Nothing is uploaded.",
       "Flags a different model answering than the one you picked, reasoning effort drops, a shrinking context window, cache-write jumps and failing tool calls.",
-      "<code>check</code> exits with status 1 when an alert fires; <code>report</code> writes an anonymized, shareable summary.",
+      "<code>check</code> exits with status 1 when an alert fires; <code>share</code> prints an anonymized summary and a prefilled regression report link.",
     ],
-    role: "Its anonymized report is what a regression report on this site contains.",
+    role: "The output of nerf-watch share is what a regression report on this site contains.",
     demo: { w: 1200, h: 700, cmd: "nerf-watch check", alt: "nerf-watch check run on synthetic Claude Code logs, flagging a silent model swap from claude-opus-5 to claude-sonnet-5, a cache-write jump and a cache hit rate collapse after a CLI update" },
   },
   {
@@ -611,9 +611,9 @@ function homePage() {
     <div class="col">
       <h3>Regression reports</h3>
       <ol class="steps">
-        <li>Run <code>npx nerf-watch report --json --out nerf-watch-report.json</code>.</li>
-        <li>Read the report. It holds aggregate numbers only.</li>
-        <li><a href="${ISSUE_FORM}">Open a regression report</a> and paste it in.</li>
+        <li>Run <code>npx nerf-watch share</code>.</li>
+        <li>Read the JSON it prints. It holds aggregate numbers only.</li>
+        <li>Open the prefilled <a href="${ISSUE_FORM}">regression report</a> link it prints and submit it.</li>
       </ol>
     </div>
   </div>
@@ -747,27 +747,73 @@ const STATUS_LABEL = {
   explained: "Explained",
 };
 
-function regressionsPage() {
-  const reports = data.regressions.slice().sort((a, b) => b.reported_at.localeCompare(a.reported_at));
-  const table = reports.length
-    ? `<div class="tablewrap"><table class="data">
-<caption class="sr-only">Reported regressions</caption>
+/** Effect size in the unit the aggregator used for the signal. */
+function effectText(v, unit) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "n/a";
+  const signed = (x, d) => `${x > 0 ? "+" : x < 0 ? "-" : ""}${Math.abs(x).toFixed(d)}`;
+  if (unit === "ratio") return `${v.toFixed(2)}x`;
+  if (unit === "pp") return `${signed(v * 100, 1)} pp`;
+  if (unit === "levels") return `${signed(v, 0)} level${Math.abs(v) === 1 ? "" : "s"}`;
+  if (unit === "share") return `${(v * 100).toFixed(1)}% of turns`;
+  return "n/a";
+}
+
+const EFFECT_NOTE = {
+  ratio: "after divided by before",
+  pp: "after minus before, in percentage points",
+  levels: "change in effort level",
+  share: "share of turns answered by another model",
+};
+
+function aggregateTable(rows) {
+  const body = rows
+    .map((a) => {
+      const versions = a.cli_before.length ? `${a.cli_before.join(", ")} to ${a.cli_version}` : a.cli_version;
+      const model = a.served_models.length ? `${a.model} (served: ${a.served_models.join(", ")})` : a.model;
+      const issues = a.issues.map((x) => `<a href="${esc(x.url)}">#${esc(x.number)}</a>`).join(", ");
+      const span = a.first_seen ? `${a.first_seen} to ${a.last_seen || a.first_seen}` : "n/a";
+      const effect = effectText(a.effect_median, a.effect_unit);
+      const effectTitle = a.effect_unit ? ` title="${esc(`Median of ${a.reports} report(s); ${EFFECT_NOTE[a.effect_unit]}`)}"` : "";
+      return `<tr><th scope="row">${esc(agentName(a.agent))}</th><td class="mono">${esc(model)}</td><td class="mono">${esc(versions)}</td><td>${esc(
+        SIGNAL_LABEL[a.signal] || a.signal,
+      )}</td><td class="num">${esc(a.reports)}</td><td class="num mono"${effectTitle}>${esc(effect)}</td><td class="mono">${esc(span)}</td><td>${issues}</td></tr>`;
+    })
+    .join("");
+  return `<div class="tablewrap"><table class="data">
+<caption class="sr-only">Community regression reports, aggregated per agent, CLI version, model and signal</caption>
+<thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col">CLI version</th><th scope="col">Signal</th><th scope="col" class="num">Independent reports</th><th scope="col" class="num">Median effect</th><th scope="col">Seen</th><th scope="col">Source issues</th></tr></thead>
+<tbody>${body}</tbody></table></div>
+<p class="small">Independent reports counts distinct GitHub accounts; one account counts once per row however many issues it files. Median effect: ratios are after divided by before, pp is the change in percentage points, and model rerouting is the share of turns another model answered. A row with one report is one person's data.</p>`;
+}
+
+function reviewedTable(reports) {
+  return `<div class="tablewrap"><table class="data">
+<caption class="sr-only">Reviewed regression reports</caption>
 <thead><tr><th scope="col">Reported</th><th scope="col">Agent</th><th scope="col">Model</th><th scope="col">CLI change</th><th scope="col">Signal</th><th scope="col">Summary</th><th scope="col" class="num">Reports</th><th scope="col">Status</th></tr></thead>
 <tbody>${reports
-        .map(
-          (r) => `<tr><td class="mono">${esc(r.reported_at)}</td><th scope="row">${esc(agentName(r.agent))}</th><td class="mono">${esc(r.model || "n/a")}</td><td class="mono">${esc(
-            `${r.cli_before || "?"} to ${r.cli_after || "?"}`,
-          )}</td><td>${esc(SIGNAL_LABEL[r.signal])}</td><td>${esc(r.summary)} <a href="${esc(r.issue_url)}">issue</a></td><td class="num">${r.independent_reports}</td><td><span class="status st-${esc(r.status)}">${esc(
-            STATUS_LABEL[r.status],
-          )}</span></td></tr>`,
-        )
-        .join("")}</tbody></table></div>`
-    : `<div class="empty">
+    .map(
+      (r) => `<tr><td class="mono">${esc(r.reported_at)}</td><th scope="row">${esc(agentName(r.agent))}</th><td class="mono">${esc(r.model || "n/a")}</td><td class="mono">${esc(
+        `${r.cli_before || "?"} to ${r.cli_after || "?"}`,
+      )}</td><td>${esc(SIGNAL_LABEL[r.signal])}</td><td>${esc(r.summary)} <a href="${esc(r.issue_url)}">issue</a></td><td class="num">${esc(r.independent_reports)}</td><td><span class="status st-${esc(r.status)}">${esc(
+        STATUS_LABEL[r.status],
+      )}</span></td></tr>`,
+    )
+    .join("")}</tbody></table></div>`;
+}
+
+function regressionsPage() {
+  const reports = data.regressions.slice().sort((a, b) => b.reported_at.localeCompare(a.reported_at));
+  const rows = data.regressionAggregates;
+  const empty = `<div class="empty">
   <svg class="empty-art" viewBox="0 0 240 64" aria-hidden="true" focusable="false"><line x1="0" y1="40" x2="240" y2="40" class="empty-base"/><path d="M0 40 H60 L66 34 L72 46 L78 40 H240" class="empty-line"/><circle cx="210" cy="40" r="4" class="empty-dot"/></svg>
   <p class="empty-title">No regression reports yet.</p>
-  <p>When reports arrive, each confirmed or open report is listed here with the agent, model, the CLI versions before and after, the signal nerf-watch flagged, how many independent reports agree, and its status. Nothing is listed on the strength of one unreviewed report.</p>
+  <p>When reports arrive, each agent, CLI version, model and signal is listed here with the number of independent reports, the median effect size, the dates it was seen and links to the source issues.</p>
   <p><a class="button" href="${ISSUE_FORM}">Report a suspected regression</a></p>
 </div>`;
+  const list =
+    !rows.length && !reports.length
+      ? empty
+      : [rows.length ? aggregateTable(rows) : "", reports.length ? `<h3>Reviewed reports</h3>\n${reviewedTable(reports)}` : ""].filter(Boolean).join("\n");
   return layout({
     path: "regressions/",
     title: "Regression watch",
@@ -790,22 +836,22 @@ function regressionsPage() {
     <li>tool calls started failing more often.</li>
   </ul>
   <p>Install command and a terminal recording: <a href="../#nerf-watch">nerf-watch on the home page</a>.</p>
-  <p>Everything runs locally. <code>nerf-watch report</code> writes aggregate numbers only: token medians, rates, CLI versions, model ids, dates and counts. It contains no prompts, responses, tool output, file paths, project names or session ids. Read it before you share it.</p>
+  <p>Everything runs locally. <code>nerf-watch share</code> builds the report from structured fields only: detector, severity, agent, model ids, CLI versions, dates, sample counts and before and after values. It contains no prompts, responses, tool output, file paths, project names, session ids, or user or host names, and it makes no network request. It prints exactly what would be shared before you share it.</p>
 </section>
 
 <section aria-labelledby="g-how">
   ${sectionHead("4.2", "Report", "How to report", "g-how")}
   <ol class="steps">
-    <li>Run <code>npx nerf-watch report --json --out nerf-watch-report.json</code> (Node.js 20 or newer).</li>
-    <li>Open the file and check that it contains nothing you do not want to publish. The issue is public.</li>
-    <li><a href="${ISSUE_FORM}">Open a regression report</a>, paste the JSON, and fill in the agent, CLI versions and model.</li>
+    <li>Run <code>npx nerf-watch share</code> (Node.js 20 or newer). It prints the anonymized JSON and a link to a prefilled report on this repository. Add <code>--open</code> to open the link in your browser.</li>
+    <li>Read the JSON. The issue is public.</li>
+    <li>Open the link, say what you observed, and submit. If the JSON was too long for the link, paste it into the report field.</li>
   </ol>
-  <p>Reports are reviewed by hand. A report is listed below once it is reviewed; its status says whether it was confirmed by more reports or by a rerun-bench run, not reproduced, or explained by a documented change.</p>
+  <p>A scheduled job reads open issues labeled <code>regression-report</code> once a day and whenever one is opened, edited, closed or relabeled. It validates the JSON against a strict schema, rejects anything that is not valid, too large, or contains path-like or email-like text, and aggregates the findings per agent, CLI version, model and signal. Closing an issue removes it from the table at the next run.</p>
 </section>
 
 <section aria-labelledby="g-list">
   ${sectionHead("4.3", "Reports", "Reported regressions", "g-list")}
-  ${table}
+  ${list}
 </section>`,
   });
 }

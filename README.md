@@ -23,12 +23,13 @@ JSON file under [`data/`](data/).
 | Path | What it is |
 |---|---|
 | `data/results/<YYYY-MM-DD>-<label>.json` | One result set each: a rerun-bench JSON report, optionally with a `lab` block of metadata. |
-| `data/regressions.json` | Reviewed regression reports, shown on the regression watch page. |
+| `data/regressions.json` | Regression watch data: `aggregates`, written by the `regressions` workflow from open regression-report issues, and hand-reviewed `reports`. |
 | `data/launches.json` | Launch-day log: model launches and the result sets published for them. |
 | `data/agents.json` | Display names and links for agent ids used in result files. |
 | `data/tasks.json` | The task suite (ids, titles, tags, timeouts), copied from rerun-bench. |
 | `scripts/build.mjs` | Builds `_site/` from `data/`. No dependencies. |
 | `scripts/validate.mjs` | Validates every data file. CI runs it on every pull request. |
+| `scripts/aggregate-regressions.mjs` | Validates and aggregates regression-report issues into `data/regressions.json`. Runs daily in `.github/workflows/regressions.yml`. |
 | `src/` | Stylesheet, the page script (tooltips, theme, copy buttons, demo playback, chart entrance), the favicon, the tool demo recordings and still frames, and the social preview image, copied to `_site/assets/`. |
 | `scripts/social.mjs` | Renders `src/social-preview.png` (and `docs/social-preview.png`) from the latest result set with headless Chrome. |
 
@@ -39,8 +40,8 @@ JSON file under [`data/`](data/).
   spread. It produces every result set here. Metric definitions:
   [docs/METRICS.md](https://github.com/Abelo9996/rerun-bench/blob/main/docs/METRICS.md).
 - [nerf-watch](https://github.com/Abelo9996/nerf-watch): local-first detector of silent model,
-  effort, token and cost changes in agent logs. Its anonymized report is what a regression
-  report contains.
+  effort, token and cost changes in agent logs. `nerf-watch share` prints the anonymized JSON
+  a regression report contains and a prefilled issue link.
 - [snap-back](https://github.com/Abelo9996/snap-back): undo for any coding agent.
 - [agent-fence](https://github.com/Abelo9996/agent-fence): one permission policy for any agent.
 - [launch-day-kit](https://github.com/Abelo9996/launch-day-kit): playbook, templates and a

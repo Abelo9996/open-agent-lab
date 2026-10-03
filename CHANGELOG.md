@@ -4,6 +4,15 @@ All notable changes to this project are listed here. Dates are UTC.
 
 ## Unreleased
 
+- Regression watch: a `regressions` workflow (daily, manual, and on regression-report issue
+  events) reads open regression-report issues, validates the nerf-watch JSON in each against a
+  strict schema, and writes per agent, CLI version, model and signal aggregates (independent
+  reports, median effect size, first and last seen, source issues) to `data/regressions.json`.
+  The regression watch page renders them; the pages workflow redeploys after a run that
+  commits. Parser, validator and aggregator tests include hostile issue bodies.
+- The regression report form and the docs point to `npx nerf-watch share`, which fills the
+  form in.
+
 - Home page: a hero that shows every run of the latest result set as a pass/fail grid, filled
   in run order on load, with pass counts that follow the grid and a replay control.
 - Home page: one section per tool (nerf-watch, rerun-bench, snap-back, agent-fence,

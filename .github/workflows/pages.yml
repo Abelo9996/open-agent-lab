@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Commits pushed by the regressions workflow use GITHUB_TOKEN, which does not
+  # trigger push events, so deploy after it instead. The build job skips when
+  # that run committed nothing (main is still at the commit it started from).
+  workflow_run:
+    workflows: [regressions]
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,6 +22,10 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_sha != github.sha)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

@@ -17,5 +17,6 @@ if (errors.length) {
 }
 console.log(
   `ok: ${data.results.length} result file(s), ${data.agents.length} agents, ${data.tasks.tasks.length} tasks, ` +
-    `${data.regressions.length} regression report(s), ${data.launches.length} launch(es)`,
+    `${data.regressions.length} reviewed regression report(s), ${data.regressionAggregates.length} aggregate regression row(s), ` +
+    `${data.launches.length} launch(es)`,
 );
