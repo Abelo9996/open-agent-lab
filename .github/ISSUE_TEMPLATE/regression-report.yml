@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for reporting. This issue is public. Generate the report with
-        `npx github:Abelo9996/nerf-watch report --json --out nerf-watch-report.json`,
+        `npx nerf-watch report --json --out nerf-watch-report.json`,
         read it, and paste it below. It should contain aggregate numbers only: no prompts,
         responses, file paths, project names or session ids.
   - type: dropdown

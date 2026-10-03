@@ -78,7 +78,7 @@ factual: no claims beyond what the numbers show.
 
 ## Submitting a regression report
 
-1. Run `npx github:Abelo9996/nerf-watch report --json --out nerf-watch-report.json`.
+1. Run `npx nerf-watch report --json --out nerf-watch-report.json`.
 2. Read the file. It should contain only aggregate numbers, CLI versions, model ids, dates
    and counts. Remove anything you do not want public.
 3. Open a [regression report](https://github.com/Abelo9996/open-agent-lab/issues/new?template=regression-report.yml)
