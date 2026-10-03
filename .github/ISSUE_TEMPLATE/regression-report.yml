@@ -1,0 +1,89 @@
+name: Regression report
+description: Report a suspected silent change in a coding agent (model, effort, tokens, cost, errors), backed by an anonymized nerf-watch report.
+title: "[regression] <agent> <cli version>: <what changed>"
+labels: ["regression-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. This issue is public. Generate the report with
+        `npx github:Abelo9996/nerf-watch report --json --out nerf-watch-report.json`,
+        read it, and paste it below. It should contain aggregate numbers only: no prompts,
+        responses, file paths, project names or session ids.
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex CLI
+        - OpenCode
+        - DeepSeek Harness
+        - Other (say which below)
+    validations:
+      required: true
+  - type: input
+    id: cli_before
+    attributes:
+      label: CLI version before the change
+      description: The last version that behaved as expected, as printed by `<cli> --version`.
+      placeholder: "2.1.271"
+    validations:
+      required: true
+  - type: input
+    id: cli_after
+    attributes:
+      label: CLI version after the change
+      description: Same version as before if the change happened without a CLI update.
+      placeholder: "2.1.272"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model requested
+      description: The model you selected or configured.
+      placeholder: "claude-opus-5"
+    validations:
+      required: true
+  - type: input
+    id: model_served
+    attributes:
+      label: Model served, if different
+      description: Only if nerf-watch or the logs show a different model answered.
+  - type: input
+    id: nerf_watch_version
+    attributes:
+      label: nerf-watch version or commit
+    validations:
+      required: true
+  - type: input
+    id: first_seen
+    attributes:
+      label: Date first noticed (YYYY-MM-DD)
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Anonymized nerf-watch report (JSON)
+      description: Output of `nerf-watch report --json`. Paste the whole file.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: What you observed
+      description: What changed for you in practice, and anything that could explain it (new plan, new project, a settings change).
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before submitting
+      options:
+        - label: I read the report and it contains nothing I do not want to publish.
+          required: true
+        - label: I did not change the model, effort or settings myself at the time of the change, or I described it above.
+          required: true

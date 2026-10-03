@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Submit results
+    url: https://github.com/Abelo9996/open-agent-lab/blob/main/CONTRIBUTING.md#submitting-results
+    about: Results are submitted as a pull request that adds a rerun-bench JSON report to data/results/.

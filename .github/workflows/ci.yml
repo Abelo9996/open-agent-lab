@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate data files
+        run: node scripts/validate.mjs
+      - name: Test the validator
+        run: npm test
+      - name: Build the site
+        run: node scripts/build.mjs
+      - name: Check built pages
+        run: |
+          for f in index.html results/index.html methodology/index.html regressions/index.html launches/index.html 404.html; do
+            test -s "_site/$f" || { echo "missing _site/$f"; exit 1; }
+          done
+          if grep -rIlP '[\x{2013}\x{2014}]' _site; then echo "long dash found in built pages"; exit 1; fi
