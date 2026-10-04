@@ -2,7 +2,25 @@
 
 All notable changes to this project are listed here. Dates are UTC.
 
-## Unreleased
+## 0.1.1 (2026-10-04)
+
+- Install commands on the home page now match the published packages and work as pasted:
+  `uvx rerun-bench run --agent mock` (rerun-bench is on PyPI; the git install is gone),
+  `npx @abelo9996/snap-back wrap -- codex`, and each tool names its prerequisite and next
+  command. The methodology page installs rerun-bench with `uv tool install rerun-bench`.
+- Plain-language reading next to the numbers: an "In plain words" summary of each result set
+  on the home and results pages, a key for pass rate and its interval, pass^k, flip rate and
+  median tokens, and the hero tallies read "95% interval: 89% to 100%" instead of a bare
+  "95% [89, 100]" that could be taken for a pass rate.
+- Results and launch-day pages end with next steps (try the mock agent, reproduce, submit
+  results, report a regression, follow launches).
+- Keyboard: each chart and the pass/fail grid is one tab stop with arrow-key movement inside
+  (the results page went from about 110 tab stops to about 25). Tables and code blocks that
+  scroll sideways get a tab stop and a name. Grid marks use text instead of aria-label on a
+  plain span. The results grid header no longer runs "run 0run 1run 2" together.
+- Phone: the page links wrap instead of scrolling sideways, so "Launch day" is visible.
+- Tests for the built pages: internal links and anchors, install commands, social tags,
+  summaries, tab stops, alt text and dashes.
 
 - Regression watch: a `regressions` workflow (daily, manual, and on regression-report issue
   events) reads open regression-report issues, validates the nerf-watch JSON in each against a

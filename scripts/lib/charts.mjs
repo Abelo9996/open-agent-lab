@@ -2,6 +2,8 @@
 // time. Horizontal positions are percentages, so the SVG scales with its
 // container without distorting marks or text. Each chart ships with a table
 // view, and every mark that carries a value has a keyboard-focusable tooltip.
+// Each chart is one tab stop: the first row or mark has tabindex 0, the rest
+// -1, and site.js moves focus between them with the arrow keys.
 
 export const esc = (s) =>
   String(s ?? "")
@@ -13,6 +15,10 @@ export const esc = (s) =>
 
 export const pct = (x, digits = 0) => (x == null ? "n/a" : `${(x * 100).toFixed(digits)}%`);
 export const ci = (iv) => (iv ? `[${Math.round(iv[0] * 100)}, ${Math.round(iv[1] * 100)}]` : "n/a");
+/** A 95% interval in words, for places where a bare "[89, 100]" would be read as data. */
+export const ciWords = (iv) => (iv ? `${Math.round(iv[0] * 100)}% to ${Math.round(iv[1] * 100)}%` : "n/a");
+/** Roving tabindex: only the first item in a group is reachable with Tab. */
+const tabStop = (i) => `tabindex="${i === 0 ? 0 : -1}"`;
 export const int = (x) => (x == null ? "n/a" : Math.round(x).toLocaleString("en-US"));
 export const usd = (x) => (x == null ? "not reported" : `$${x.toFixed(4)}`);
 export const secs = (x) => (x == null ? "n/a" : `${x.toFixed(1)} s`);
@@ -63,10 +69,10 @@ const originPct = (est, lo, hi) => (hi > lo ? `${(((est - lo) / (hi - lo)) * 100
 export function intervalChart({ id, title, desc, rows, compactView = false }) {
   const H = 28;
   const body = rows
-    .map((r) => {
+    .map((r, ri) => {
       const w = Math.max(r.hi - r.lo, 0.004);
       const label = `${r.label}: ${pct(r.est)}, 95% interval ${pct(r.lo)} to ${pct(r.hi)}`;
-      return `<div class="crow" tabindex="0" role="listitem" aria-label="${esc(label)}" data-tip="${tip([
+      return `<div class="crow" ${tabStop(ri)} role="listitem" aria-label="${esc(label)}" data-tip="${tip([
         `${pct(r.est, 1)}  ${ci([r.lo, r.hi])}`,
         r.label,
         r.tipNote || "pass rate, Wilson 95% interval",
@@ -86,7 +92,7 @@ export function intervalChart({ id, title, desc, rows, compactView = false }) {
     : tableView(title, ["Agent", "Pass rate", "95% low", "95% high"], rows.map((r) => [r.label, pct(r.est, 1), pct(r.lo, 1), pct(r.hi, 1)]));
   return `<figure class="chart" id="${esc(id)}" aria-labelledby="${esc(id)}-t">
   <figcaption><span class="ctitle" id="${esc(id)}-t">${esc(title)}</span>${desc ? `<span class="cdesc">${esc(desc)}</span>` : ""}</figcaption>
-  <div class="cbody" role="list">${body}
+  <div class="cbody" role="list" data-rove>${body}
   ${axisRow(PCT_TICKS, (t) => `${t * 100}%`)}</div>
   ${table}
 </figure>`;
@@ -118,7 +124,7 @@ export function multiDotChart({ id, title, desc, series, rows }) {
   const lanes = series.length;
   const H = 12 + lanes * 10;
   const body = rows
-    .map((r) => {
+    .map((r, ri) => {
       const vals = r.values;
       const lo = Math.min(...vals);
       const hi = Math.max(...vals);
@@ -126,7 +132,7 @@ export function multiDotChart({ id, title, desc, series, rows }) {
         .map((v, i) => marker(SHAPES[i], `mk s${i + 1}`, P(v), 6 + i * 10 + 5, 4.5))
         .join("");
       const label = `${r.label}: ${series.map((s, i) => `${s} ${pct(vals[i])}`).join(", ")}`;
-      return `<div class="crow" tabindex="0" role="listitem" aria-label="${esc(label)}" data-tip="${tip([
+      return `<div class="crow" ${tabStop(ri)} role="listitem" aria-label="${esc(label)}" data-tip="${tip([
         series.map((s, i) => `${s} ${pct(vals[i], 1)}`).join("   "),
         r.label,
       ])}">
@@ -144,7 +150,7 @@ export function multiDotChart({ id, title, desc, series, rows }) {
   return `<figure class="chart" id="${esc(id)}" aria-labelledby="${esc(id)}-t">
   <figcaption><span class="ctitle" id="${esc(id)}-t">${esc(title)}</span>${desc ? `<span class="cdesc">${esc(desc)}</span>` : ""}</figcaption>
   ${legend(series)}
-  <div class="cbody" role="list">${body}
+  <div class="cbody" role="list" data-rove>${body}
   ${axisRow(PCT_TICKS, (t) => `${t * 100}%`)}</div>
   ${table}
 </figure>`;
@@ -171,7 +177,7 @@ export function rangeChart({ id, title, desc, series, rows, fmt = compact, unit 
   const H = 10 + lanes * 10;
   const x = (v) => P(v / top);
   const body = rows
-    .map((r) => {
+    .map((r, ri) => {
       const marks = r.values
         .map((v, i) => {
           if (!v || v.median == null) return "";
@@ -182,7 +188,7 @@ export function rangeChart({ id, title, desc, series, rows, fmt = compact, unit 
       const tipLines = r.values.map((v, i) =>
         v && v.median != null ? `${series[i]}: median ${fmt(v.median)}${unit}, ${fmt(v.min)} to ${fmt(v.max)}` : `${series[i]}: not reported`,
       );
-      return `<div class="crow" tabindex="0" role="listitem" aria-label="${esc(`${r.label}. ${tipLines.join(". ")}`)}" data-tip="${tip([
+      return `<div class="crow" ${tabStop(ri)} role="listitem" aria-label="${esc(`${r.label}. ${tipLines.join(". ")}`)}" data-tip="${tip([
         tipLines.join("\n"),
         r.label,
       ])}">
@@ -200,7 +206,7 @@ export function rangeChart({ id, title, desc, series, rows, fmt = compact, unit 
   return `<figure class="chart chart-range" id="${esc(id)}" aria-labelledby="${esc(id)}-t">
   <figcaption><span class="ctitle" id="${esc(id)}-t">${esc(title)}</span>${desc ? `<span class="cdesc">${esc(desc)}</span>` : ""}</figcaption>
   ${legend(series)}
-  <div class="cbody" role="list">${body}
+  <div class="cbody" role="list" data-rove>${body}
   ${axisRow(ticks.map((t) => t / top), (t) => fmt(t * top))}</div>
   ${tableView(title, head, tRows)}
 </figure>`;
@@ -215,10 +221,11 @@ export function consistencyGrid({ id, title, desc, tasks, agents }) {
   const head2 = agents
     .map(
       (a) =>
-        Array.from({ length: a.runs }, (_, i) => `<th scope="col" class="run"><span class="sr-only">${esc(a.label)} </span><span class="rl">run </span>${i}</th>`).join("") +
+        Array.from({ length: a.runs }, (_, i) => `<th scope="col" class="run"><span class="sr-only">${esc(a.label)} run </span>${i}</th>`).join("") +
         `<th scope="col" class="run rate">rate</th>`,
     )
     .join("");
+  let marks = 0;
   const body = tasks
     .map((t) => {
       const cells = agents
@@ -229,7 +236,7 @@ export function consistencyGrid({ id, title, desc, tasks, agents }) {
             const o = out[i];
             if (o === undefined) return `<td class="cell na"><span class="sr-only">no run</span></td>`;
             const word = o ? "pass" : "fail";
-            return `<td class="cell"><span class="run-mark ${word}" tabindex="0" data-tip="${tip([word, `${a.label}, ${t.id}, run ${i}`])}" aria-label="${esc(`${a.label}, ${t.id}, run ${i}: ${word}`)}"><span aria-hidden="true">${o ? "&#10003;" : "&#10005;"}</span></span></td>`;
+            return `<td class="cell"><span class="run-mark ${word}" ${tabStop(marks++)} data-tip="${tip([word, `${a.label}, ${t.id}, run ${i}`])}"><span aria-hidden="true">${o ? "&#10003;" : "&#10005;"}</span><span class="sr-only">${esc(`${a.label}, ${t.id}, run ${i}: ${word}`)}</span></span></td>`;
           }).join("");
           const passes = out.filter(Boolean).length;
           return `${runs}<td class="cell rate">${passes}/${out.length}</td>`;
@@ -241,7 +248,7 @@ export function consistencyGrid({ id, title, desc, tasks, agents }) {
   return `<figure class="chart" id="${esc(id)}" aria-labelledby="${esc(id)}-t">
   <figcaption><span class="ctitle" id="${esc(id)}-t">${esc(title)}</span>${desc ? `<span class="cdesc">${esc(desc)}</span>` : ""}</figcaption>
   <ul class="legend" aria-label="Legend"><li><span class="run-mark pass" aria-hidden="true">&#10003;</span>pass (verifier exited 0)</li><li><span class="run-mark fail" aria-hidden="true">&#10005;</span>fail</li></ul>
-  <div class="tablewrap"><table class="grid-table">
+  <div class="tablewrap"><table class="grid-table" data-rove>
     <caption class="sr-only">${esc(title)}</caption>
     <thead><tr><td></td>${head1}</tr><tr><th scope="col" class="task">Task</th>${head2}</tr></thead>
     <tbody>${body}</tbody>

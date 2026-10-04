@@ -114,6 +114,83 @@
     );
   })();
 
+  // ------------------------------------------------------------ keyboard
+  // Each chart and each pass/fail grid is one tab stop. Inside it, the arrow
+  // keys move between rows or runs (Up and Down move by row in a grid), and
+  // Home and End jump to the first and last item.
+  (function () {
+    var groups = document.querySelectorAll("[data-rove]");
+    function items(g) {
+      return g.querySelectorAll(g.tagName === "TABLE" ? ".run-mark[tabindex]" : ".crow[tabindex]");
+    }
+    function move(g, from, to) {
+      if (!to || to === from) return;
+      from.setAttribute("tabindex", "-1");
+      to.setAttribute("tabindex", "0");
+      to.focus();
+    }
+    for (var i = 0; i < groups.length; i++) {
+      groups[i].addEventListener("keydown", function (e) {
+        var g = e.currentTarget;
+        var list = Array.prototype.slice.call(items(g));
+        var at = list.indexOf(document.activeElement);
+        if (at < 0) return;
+        var to = null;
+        if (g.tagName === "TABLE" && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+          var row = list[at].closest("tr");
+          var inRow = Array.prototype.slice.call(row.querySelectorAll(".run-mark[tabindex]"));
+          var col = inRow.indexOf(list[at]);
+          var next = e.key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
+          while (next && !next.querySelector(".run-mark[tabindex]")) next = e.key === "ArrowDown" ? next.nextElementSibling : next.previousElementSibling;
+          if (next) {
+            var cells = next.querySelectorAll(".run-mark[tabindex]");
+            to = cells[Math.min(col, cells.length - 1)];
+          }
+        } else if (e.key === "ArrowRight" || e.key === "ArrowDown") to = list[at + 1];
+        else if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = list[at - 1];
+        else if (e.key === "Home") to = list[0];
+        else if (e.key === "End") to = list[list.length - 1];
+        else return;
+        e.preventDefault();
+        move(g, list[at], to);
+      });
+    }
+
+    // A table or code block that scrolls sideways must be reachable from the
+    // keyboard, so it gets a tab stop and a name, but only while it overflows.
+    var scrollers = document.querySelectorAll(".tablewrap, main pre");
+    function label(el) {
+      var cap = el.querySelector("caption");
+      if (cap) return cap.textContent.trim() + " (scrolls sideways)";
+      return "Code (scrolls sideways)";
+    }
+    function check() {
+      for (var j = 0; j < scrollers.length; j++) {
+        var el = scrollers[j];
+        var over = el.scrollWidth > el.clientWidth + 1 && el.offsetParent !== null;
+        if (over && !el.hasAttribute("tabindex")) {
+          el.setAttribute("tabindex", "0");
+          el.setAttribute("role", "region");
+          el.setAttribute("aria-label", label(el));
+          el.setAttribute("data-scroll-stop", "");
+        } else if (!over && el.hasAttribute("data-scroll-stop")) {
+          el.removeAttribute("tabindex");
+          el.removeAttribute("role");
+          el.removeAttribute("aria-label");
+          el.removeAttribute("data-scroll-stop");
+        }
+      }
+    }
+    check();
+    var t = 0;
+    window.addEventListener("resize", function () {
+      clearTimeout(t);
+      t = setTimeout(check, 150);
+    });
+    // Table views inside <details> only overflow once opened.
+    document.addEventListener("toggle", check, true);
+  })();
+
   // ------------------------------------------------------------ theme
   (function () {
     var btn = document.querySelector("[data-theme-toggle]");

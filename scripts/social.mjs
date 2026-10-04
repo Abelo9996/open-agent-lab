@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { loadAll } from "./lib/data.mjs";
-import { esc, ci } from "./lib/charts.mjs";
+import { esc, ciWords } from "./lib/charts.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (name) => {
@@ -58,7 +58,7 @@ if (latest) {
   const tallies = es
     .map(
       (e) =>
-        `<div><span class="lab">${esc(agentName(e.agent))}</span><span class="num">${e.metrics.passes}/${e.metrics.n_runs}</span><span class="ci">passed, 95% ${ci(e.metrics.pass_rate_ci95)}</span></div>`,
+        `<div><span class="lab">${esc(agentName(e.agent))}</span><span class="num">${e.metrics.passes}/${e.metrics.n_runs}</span><span class="ci">passed<br>95% interval: ${ciWords(e.metrics.pass_rate_ci95).replace(/% to /, " to ")}</span></div>`,
     )
     .join("");
   panel = `<div class="panel">

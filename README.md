@@ -39,13 +39,17 @@ JSON file under [`data/`](data/).
   agent and reports pass rate with a Wilson interval, pass^k, flip rate, and cost and token
   spread. It produces every result set here. Metric definitions:
   [docs/METRICS.md](https://github.com/Abelo9996/rerun-bench/blob/main/docs/METRICS.md).
+  Try it free with the mock agent: `uvx rerun-bench run --agent mock`.
 - [nerf-watch](https://github.com/Abelo9996/nerf-watch): local-first detector of silent model,
-  effort, token and cost changes in agent logs. `nerf-watch share` prints the anonymized JSON
-  a regression report contains and a prefilled issue link.
-- [snap-back](https://github.com/Abelo9996/snap-back): undo for any coding agent.
-- [agent-fence](https://github.com/Abelo9996/agent-fence): one permission policy for any agent.
+  effort, token and cost changes in agent logs: `npx nerf-watch check`. `npx nerf-watch share`
+  prints the anonymized JSON a regression report contains and a prefilled issue link.
+- [snap-back](https://github.com/Abelo9996/snap-back): undo for any coding agent:
+  `npx @abelo9996/snap-back wrap -- codex`, or `npm install -g @abelo9996/snap-back`.
+- [agent-fence](https://github.com/Abelo9996/agent-fence): one permission policy for any agent:
+  `npm install -g @abelo9996/agent-fence`.
 - [launch-day-kit](https://github.com/Abelo9996/launch-day-kit): playbook, templates and a
-  scaffolder for shipping a companion repo within hours of a platform launch.
+  scaffolder for shipping a companion repo within hours of a platform launch:
+  `git clone https://github.com/Abelo9996/launch-day-kit`.
 
 Each tool has a section on the home page with its install command and a terminal recording,
 linked by name: [#nerf-watch](https://abelo9996.github.io/open-agent-lab/#nerf-watch),
@@ -56,8 +60,9 @@ linked by name: [#nerf-watch](https://abelo9996.github.io/open-agent-lab/#nerf-w
 
 ## Add a result set
 
-1. Run rerun-bench with at least 3 runs per task, then
-   `rerun-bench report results/ --format json -o report.json`.
+1. Run rerun-bench with at least 3 runs per task (for example
+   `uvx rerun-bench run --agent claude --runs 3 --out results/`), then
+   `uvx rerun-bench report results/ --format json -o report.json`.
 2. Copy the file to `data/results/<YYYY-MM-DD>-<label>.json`, where the date is the day the
    runs started (UTC) and the label is lowercase letters, digits and hyphens.
 3. Optionally add a `lab` block (title, pilot flag, notes, links). See
@@ -73,7 +78,7 @@ Requires Node.js 20 or newer. There is nothing to install.
 
 ```sh
 npm run validate   # check data/
-npm test           # tests for the validator
+npm test           # validator, regression aggregator and built-page tests
 npm run build      # write _site/
 npm run serve      # preview at http://localhost:8080/
 npm run social     # re-render the social preview image (needs Chrome)

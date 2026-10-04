@@ -12,6 +12,7 @@ import {
   esc,
   pct,
   ci,
+  ciWords,
   int,
   usd,
   secs,
@@ -175,6 +176,30 @@ function overlapVerdict(entries) {
   return `The 95% intervals do not overlap for: ${apart.join("; ")}. The intervals treat runs as independent, so they understate uncertainty about the task population; see the task-bootstrap interval in the table below before reading this as a difference.`;
 }
 
+// One or two sentences a stranger can read without knowing the metrics:
+// what each agent scored, on how many runs, and whether this is a pilot.
+function plainSummary(r, name = agentName) {
+  const es = r.entries.slice().sort((a, b) => name(a.agent).localeCompare(name(b.agent)));
+  const nTasks = Math.max(...es.map((e) => e.metrics.n_tasks));
+  const runs = Math.min(...es.map((e) => e.metrics.min_runs_per_task));
+  const parts = es.map((e) => `${name(e.agent)} passed ${e.metrics.passes} of ${e.metrics.n_runs} runs`);
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+  let out = `${list}: ${nTasks} tasks, each run ${runs} times, every run scored only by the task's own test script.`;
+  if (r.lab.pilot) out += " This is a pilot: it checks that the harness works end to end against real CLIs, and it is too small to rank agents.";
+  return out;
+}
+
+// Plain-language meaning of the headline numbers, shown next to them.
+function metricKey(k) {
+  const rows = [
+    ["pass rate [low, high]", "Share of runs that passed. The brackets are the 95% interval: the range of true pass rates these runs are consistent with. Few runs give a wide range."],
+    [`pass^${k}`, `Chance that all ${k} runs of a task pass. Read it as how far you can trust a single run.`],
+    ["flip rate", "Chance that two runs of the same task disagree, one pass and one fail. 0% means every task gave the same result every time."],
+    ["median tokens", "Tokens a typical run used, including cached input."],
+  ];
+  return `<dl class="key">${rows.map(([t, d]) => `<div><dt>${esc(t)}</dt><dd>${esc(d)}</dd></div>`).join("")}</dl>`;
+}
+
 const entryLabel = (e) => agentName(e.agent);
 const entrySub = (e) => [e.model, e.cli_version].filter(Boolean).join(" · ");
 
@@ -244,6 +269,7 @@ function resultSection(r, idx) {
     <p class="eyebrow"><span class="mono">${esc(r.date)}</span> result set ${idx + 1} of ${data.results.length}</p>
     <h2 id="${id}">${esc(title)}</h2>
     <p class="badges">${resultBadges(r)} ${badge(`rerun-bench ${r.rerun_bench_version}`)}${r.lab.harness_commit ? " " + badge(`harness ${r.lab.harness_commit}`) : ""}</p>
+    <p class="summary"><strong>In plain words:</strong> ${esc(plainSummary(r))}</p>
     <p class="links"><a href="../data/results/${esc(r.file)}">Raw JSON</a>${r.lab.source_url ? ` &middot; <a href="${esc(r.lab.source_url)}">Run records, diffs and notes</a>` : ""}</p>
   </header>
 
@@ -255,7 +281,7 @@ function resultSection(r, idx) {
   ${intervalChart({
     id: `${id}-ci`,
     title: "Pass rate with Wilson 95% interval",
-    desc: "Dot is the share of runs that passed the task verifier; the bar is the 95% interval. Agents are listed alphabetically.",
+    desc: "The dot is the share of runs that passed. The bar is the 95% interval: the range of true pass rates these runs are consistent with, so a wider bar means less certainty. Agents are listed alphabetically.",
     rows: es.map((e) => ({
       label: entryLabel(e),
       sub: entrySub(e),
@@ -271,7 +297,7 @@ function resultSection(r, idx) {
   ${multiDotChart({
     id: `${id}-k`,
     title: `pass^${k}, pass@1 and pass@${k}`,
-    desc: `pass^${k} is the chance that all ${k} runs of a task pass; pass@${k} that at least one does. The gap between them is the cost of inconsistency.`,
+    desc: `pass^${k} is the chance that all ${k} runs of a task pass (how far you can trust one run); pass@1 is the plain pass rate; pass@${k} is the chance that at least one of ${k} runs passes (what retrying until it works gets you). The gap between them is the cost of inconsistency.`,
     series: [`pass^${k}`, "pass@1", `pass@${k}`],
     rows: es.map((e) => ({
       label: entryLabel(e),
@@ -283,7 +309,7 @@ function resultSection(r, idx) {
   ${consistencyGrid({
     id: `${id}-grid`,
     title: "Every run, by task",
-    desc: "Each mark is one run. A task with both marks in a row is a flaky task for that agent.",
+    desc: `Each mark is one run. Columns ${Array.from({ length: maxRuns }, (_, i) => i).join(", ")} are the runs in the order they ran. A row with both a pass and a fail is a flaky task for that agent.`,
     tasks,
     agents: es.map((e) => ({
       label: entryLabel(e),
@@ -360,7 +386,15 @@ function resultsPage() {
   </div>
 </div>
 ${index}
-${body}`,
+${body}
+<section class="next" aria-labelledby="next">
+  <h2 id="next">Run it yourself or add results</h2>
+  <ul class="plain">
+    <li>Try the harness for free with its mock agent: <code>uvx rerun-bench run --agent mock</code>. <a href="../methodology/#m-repro">Reproduce this result set</a> with a real CLI.</li>
+    <li>Add a result set from your own machine: <a href="${REPO}/blob/main/CONTRIBUTING.md#submitting-results">how to submit results</a>.</li>
+    <li>Seen an agent quietly get worse after an update? <a href="../regressions/">Send a regression report</a>.</li>
+  </ul>
+</section>`,
   });
 }
 
@@ -413,7 +447,7 @@ function heroPanel(r) {
     .map(
       (e, ai) => `<div class="hg-tally">
   <dt>${esc(agentName(e.agent))}</dt>
-  <dd><span class="hg-num"><span data-count-agent="${ai}">${e.metrics.passes}</span>/${e.metrics.n_runs}</span> passed <span class="hg-ci">95% ${ci(e.metrics.pass_rate_ci95)}</span></dd>
+  <dd><span class="hg-num"><span data-count-agent="${ai}">${e.metrics.passes}</span>/${e.metrics.n_runs}</span> passed <span class="hg-ci">95% interval: ${ciWords(e.metrics.pass_rate_ci95)}</span></dd>
 </div>`,
     )
     .join("");
@@ -440,6 +474,7 @@ const TOOL_LIST = [
     url: TOOLS.nerfWatch,
     outcome: "Find out when your coding agent quietly got worse or more expensive.",
     install: "npx nerf-watch check",
+    then: "Needs Node.js 20 or newer. Then <code>npx nerf-watch share</code> prints an anonymized report for the <a href=\"regressions/\">regression watch</a>.",
     facts: [
       "Reads the session logs Claude Code and Codex already write on your machine. Nothing is uploaded.",
       "Flags a different model answering than the one you picked, reasoning effort drops, a shrinking context window, cache-write jumps and failing tool calls.",
@@ -453,7 +488,8 @@ const TOOL_LIST = [
     kind: "Repeated-run benchmark",
     url: TOOLS.rerunBench,
     outcome: "Run the same coding task N times per agent and see how often it passes, how often it flips, and how much the bill varies.",
-    install: "uv tool install git+https://github.com/Abelo9996/rerun-bench",
+    install: "uvx rerun-bench run --agent mock",
+    then: "Needs <a href=\"https://docs.astral.sh/uv/\">uv</a>. The mock agent is free and finishes in seconds. <code>--agent claude</code>, <code>codex</code> or <code>opencode</code> drives a real CLI and spends credit. To keep it installed: <code>uv tool install rerun-bench</code>.",
     facts: [
       "Each run starts from a fresh temporary copy of the task, and passes only if the task's verifier exits 0.",
       "Reports pass rate with a Wilson 95% interval, pass^k, flip rate, and cost and token spread.",
@@ -467,7 +503,8 @@ const TOOL_LIST = [
     kind: "Undo",
     url: TOOLS.snapBack,
     outcome: "Roll back whatever a coding agent did to your files with one command, without touching your own git history.",
-    install: "npm install -g @abelo9996/snap-back",
+    install: "npx @abelo9996/snap-back wrap -- codex",
+    then: "Runs Codex with snapshots on; put any agent command after <code>--</code>. Then <code>npx @abelo9996/snap-back undo</code> rolls its changes back. For everyday use: <code>npm install -g @abelo9996/snap-back</code>. Needs Node.js 20 or newer.",
     facts: [
       "Snapshots the project into a separate shadow git repository; your own <code>.git</code> is never read or written.",
       "Works with any agent, because it watches files rather than the agent.",
@@ -482,6 +519,7 @@ const TOOL_LIST = [
     url: TOOLS.agentFence,
     outcome: "One policy file decides what every coding agent on your machine may run, read and write, and logs everything it tried.",
     install: "npm install -g @abelo9996/agent-fence",
+    then: "Then, in a project: <code>agent-fence init</code> writes a commented starter policy, and <code>agent-fence hooks install --agent claude</code> enforces it in Claude Code. Needs Node.js 20 or newer.",
     facts: [
       "Allow, ask or deny shell commands, file access and git operations from one <code>.agent-fence.toml</code>.",
       "Claude Code and Codex enforce it through their hooks; any other agent can run its commands through a wrapper.",
@@ -496,6 +534,7 @@ const TOOL_LIST = [
     url: TOOLS.launchDayKit,
     outcome: "Ship a companion repo within hours of an AI platform launch.",
     install: "git clone https://github.com/Abelo9996/launch-day-kit",
+    then: "Then <code>cd launch-day-kit &amp;&amp; node bin/new-launch.mjs --list</code> lists the templates. Needs Node.js 22 or newer; nothing to install.",
     facts: [
       "A playbook with a T-minus and T-plus checklist, naming rules and a README pattern.",
       "Five tested templates: awesome-list, terminal UI, desktop app, plugin market and model router.",
@@ -513,7 +552,8 @@ function toolSection(t, i) {
     <p class="eyebrow"><span class="mono">${n}</span> ${esc(t.kind)}</p>
     <h3 id="${t.id}-h" class="tool-name"><a class="anchor" href="#${t.id}"><span class="mono">${t.id}</span><span class="anchor-mark" aria-hidden="true">#</span></a></h3>
     <p class="outcome">${esc(t.outcome)}</p>
-    <div class="cmd"><pre><code>${esc(t.install)}</code></pre><button type="button" class="copy" data-copy hidden>Copy</button></div>
+    <div class="cmd"><pre><code>${esc(t.install)}</code></pre><button type="button" class="copy" data-copy hidden aria-label="Copy the ${t.id} command">Copy</button></div>
+    ${t.then ? `<p class="cmd-then small">${t.then}</p>` : ""}
     <ul class="facts">${t.facts.map((f) => `<li>${f}</li>`).join("")}</ul>
     <p class="tool-role">${esc(t.role)}</p>
     <p class="tool-links"><a class="go" href="${t.url}">Repository</a> <a class="go" href="${t.url}/blob/main/README.md">README</a></p>
@@ -521,7 +561,7 @@ function toolSection(t, i) {
   <figure class="demo">
     <div class="demo-bar"><span class="mono">$ ${esc(t.demo.cmd)}</span><button type="button" class="demo-toggle" data-demo-toggle hidden aria-pressed="false">Pause</button></div>
     <div class="demo-frame" style="aspect-ratio:${t.demo.w} / ${t.demo.h}"><img src="assets/demos/${t.id}.webp" data-gif="assets/demos/${t.id}.gif" width="${t.demo.w}" height="${t.demo.h}" loading="lazy" decoding="async" alt="${esc(t.demo.alt)}"></div>
-    <figcaption class="small">Terminal recording from the repository. Still frame shown until it loads. <a href="assets/demos/${t.id}.gif">Open the animated demo</a>.</figcaption>
+    <figcaption class="small">Terminal recording from the repository. It plays while on screen; with reduced motion on, the still frame stays until you press Play. <a href="assets/demos/${t.id}.gif">Open the animated demo</a>.</figcaption>
   </figure>
 </section>`;
 }
@@ -551,6 +591,7 @@ function homePage() {
     <p class="mono small">${esc(latest.date)}</p>
     <h3>${esc(latest.lab.title || latest.label)}</h3>
     <p class="badges">${resultBadges(latest)}</p>
+    <p class="summary"><strong>In plain words:</strong> ${esc(plainSummary(latest))}</p>
   </div>
   ${intervalChart({
     id: "home-ci",
@@ -566,6 +607,7 @@ function homePage() {
     compactView: true,
   })}
   <div class="tiles">${tiles}</div>
+  ${metricKey(k)}
   <p class="verdict" role="note">${esc(overlapVerdict(es))}</p>
   <p><a class="more" href="results/">Full results, per-task grid and table view</a></p>
 </div>`;
@@ -579,9 +621,10 @@ function homePage() {
   <div class="hero-text">
     <p class="eyebrow"><span class="mono">01</span> open agent lab</p>
     <h1>Coding agents, measured more than once.</h1>
-    <p class="lede">An independent lab that reruns the same coding tasks many times per agent, model and CLI version, and publishes how often each run passes, how often results flip, and what each run costs, with the uncertainty shown.</p>
+    <p class="lede">An independent lab that runs the same coding tasks many times on agents such as Claude Code and Codex CLI, and publishes how often they pass, how often the result flips between runs, and what a run costs. One run is an anecdote; this site shows the spread and the uncertainty.</p>
     <p class="hero-links"><a class="button" href="results/">See results</a> <a class="button ghost" href="methodology/">How runs are scored</a></p>
-    <ul class="jump" aria-label="Tools">${TOOL_LIST.map((t) => `<li><a href="#${t.id}" class="mono">${t.id}</a></li>`).join("")}</ul>
+    <p class="jump-label small" id="jump-label">Free, open-source tools the lab is built on:</p>
+    <ul class="jump" aria-labelledby="jump-label">${TOOL_LIST.map((t) => `<li><a href="#${t.id}" class="mono">${t.id}</a></li>`).join("")}</ul>
   </div>
   ${latest ? heroPanel(latest) : ""}
 </section>
@@ -593,7 +636,7 @@ function homePage() {
 
 <section aria-labelledby="tools" class="tools-wrap">
   ${sectionHead("03", "Tools", "The tools behind the lab", "tools")}
-  <p>All five are open source and run on your own machine. Each section has a stable link, such as <a class="nowrap" href="#nerf-watch">#nerf-watch</a>.</p>
+  <p>All five are open source and run on your own machine. Each one starts with a command you can paste as is. Each section has a stable link, such as <a class="nowrap" href="#nerf-watch">#nerf-watch</a>.</p>
   ${TOOL_LIST.map(toolSection).join("\n")}
 </section>
 
@@ -603,8 +646,8 @@ function homePage() {
     <div class="col">
       <h3>Results</h3>
       <ol class="steps">
-        <li>Run <a href="${TOOLS.rerunBench}">rerun-bench</a> with at least 3 runs per task.</li>
-        <li>Generate the JSON report: <code>rerun-bench report results/ --format json</code>.</li>
+        <li>Run <a href="${TOOLS.rerunBench}">rerun-bench</a> with at least 3 runs per task: <code>uvx rerun-bench run --agent claude --runs 3 --out results/</code>.</li>
+        <li>Generate the JSON report: <code>uvx rerun-bench report results/ --format json -o report.json</code>.</li>
         <li>Save it as <code>data/results/&lt;YYYY-MM-DD&gt;-&lt;label&gt;.json</code> and open a pull request with the CLI versions, models and machine.</li>
       </ol>
     </div>
@@ -717,7 +760,7 @@ function methodologyPage() {
 
 <section aria-labelledby="m-repro">
   ${sectionHead("3.7", "Reproduce", "Reproduce a result set", "m-repro")}
-  <pre><code>uv tool install git+https://github.com/Abelo9996/rerun-bench
+  <pre><code>uv tool install rerun-bench
 rerun-bench run --agent claude --tasks all --runs 3 --out results/ --run-id claude --yes
 rerun-bench run --agent codex --model &lt;model&gt; --tasks all --runs 3 --out results/ --run-id codex --yes
 rerun-bench report results/ --format json -o report.json</code></pre>
@@ -900,8 +943,16 @@ function launchesPage() {
   <p>For shipping a companion repository on the same clock, see <a href="../#launch-day-kit">launch-day-kit</a>.</p>
 </section>
 
+<section aria-labelledby="l-follow">
+  ${sectionHead("5.2", "Follow", "Follow along or run it yourself", "l-follow")}
+  <ul class="plain">
+    <li>Watch the <a href="${REPO}">repository on GitHub</a>: each launch-day result set lands as a commit to <code>data/results/</code>.</li>
+    <li>Run the same suite on a new model yourself with <a href="../#rerun-bench">rerun-bench</a> and <a href="${REPO}/blob/main/CONTRIBUTING.md#submitting-results">submit the report</a>.</li>
+  </ul>
+</section>
+
 <section aria-labelledby="l-list">
-  ${sectionHead("5.2", "Log", "Launch-day log", "l-list")}
+  ${sectionHead("5.3", "Log", "Launch-day log", "l-list")}
   ${table}
 </section>`,
   });
