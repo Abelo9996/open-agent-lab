@@ -72,6 +72,16 @@ test("tool install commands match the published packages", () => {
   assert.match(html["methodology/index.html"], /uv tool install rerun-bench\n/);
 });
 
+test("packaged tools show their Homebrew tap install line", () => {
+  const brews = [...html["index.html"].matchAll(/<p class="cmd-brew small">Homebrew \(macOS and Linux\): <code>([^<]+)<\/code><\/p>/g)].map((m) => m[1]);
+  assert.deepEqual(brews, [
+    "brew install abelo9996/tap/nerf-watch",
+    "brew install abelo9996/tap/rerun-bench",
+    "brew install abelo9996/tap/snap-back",
+    "brew install abelo9996/tap/agent-fence",
+  ]);
+});
+
 test("every tool section names a next step after its first command", () => {
   const thens = html["index.html"].match(/<p class="cmd-then small">/g) || [];
   assert.equal(thens.length, 5);
