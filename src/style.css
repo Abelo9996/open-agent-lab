@@ -2008,3 +2008,54 @@ ul.facts li::before {
     animation: none !important;
   }
 }
+
+/* ------------------------------------------------------------ findings */
+
+.post {
+  max-width: 48rem;
+}
+.post > p,
+.post > ul {
+  max-width: 44rem;
+}
+.post h1 {
+  max-width: 28ch;
+}
+.post h2 {
+  margin-top: 2.6rem;
+}
+.post .byline {
+  margin: 0.4rem 0 0;
+}
+.post .lede {
+  margin-top: 1.5rem;
+}
+.post .chart,
+.post .tablewrap {
+  margin: 1.4rem 0;
+}
+.post .cmd {
+  max-width: 44rem;
+}
+.findings-list li {
+  margin-bottom: 1rem;
+}
+.finding-link {
+  max-width: 48rem;
+}
+@media (max-width: 520px) {
+  table.post-table th,
+  table.post-table td {
+    padding: 0.45rem 0.5rem;
+  }
+  table.post-table thead th {
+    white-space: normal;
+  }
+  table.post-table tbody th {
+    min-width: 0;
+  }
+  table.post-table .num {
+    font-size: 0.8rem;
+    white-space: normal;
+  }
+}

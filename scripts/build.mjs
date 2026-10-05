@@ -84,14 +84,21 @@ const HEAD_SCRIPT = `(function(){var d=document.documentElement;d.classList.add(
 
 const themeIcon = `<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg>`;
 
-function layout({ path, title, description, body, absolute = false }) {
+const DEFAULT_IMAGE = {
+  url: SOCIAL_IMAGE,
+  w: 1280,
+  h: 640,
+  alt: "open agent lab: coding agents, measured more than once. A pass and fail grid of repeated runs per task.",
+};
+
+function layout({ path, title, description, body, absolute = false, image = DEFAULT_IMAGE, ogType = "website", head = "", fullTitle: titleOverride }) {
   const depth = path === "" ? 0 : path.split("/").filter(Boolean).length;
   const pre = absolute ? BASE : depth ? "../".repeat(depth) : "./";
   const nav = NAV.map(([href, label]) => {
     const cur = href === path ? ' aria-current="page"' : "";
     return `<li><a href="${pre}${href}"${cur}>${esc(label)}</a></li>`;
   }).join("");
-  const fullTitle = path === "" ? "open agent lab" : `${title} | open agent lab`;
+  const fullTitle = titleOverride || (path === "" ? "open agent lab" : `${title} | open agent lab`);
   const url = absolute ? SITE_URL : `${SITE_URL}${path}`;
   return `<!doctype html>
 <html lang="en">
@@ -101,19 +108,21 @@ function layout({ path, title, description, body, absolute = false }) {
 <meta name="color-scheme" content="light dark">
 <title>${esc(fullTitle)}</title>
 <meta name="description" content="${esc(description)}">
-${absolute ? "" : `<link rel="canonical" href="${esc(url)}">\n`}<meta property="og:type" content="website">
+${absolute ? "" : `<link rel="canonical" href="${esc(url)}">\n`}<meta property="og:type" content="${esc(ogType)}">
 <meta property="og:site_name" content="open agent lab">
 <meta property="og:title" content="${esc(fullTitle)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
-<meta property="og:image" content="${esc(SOCIAL_IMAGE)}">
-<meta property="og:image:width" content="1280">
-<meta property="og:image:height" content="640">
-<meta property="og:image:alt" content="open agent lab: coding agents, measured more than once. A pass and fail grid of repeated runs per task.">
+<meta property="og:image" content="${esc(image.url)}">
+<meta property="og:image:width" content="${image.w}">
+<meta property="og:image:height" content="${image.h}">
+<meta property="og:image:alt" content="${esc(image.alt)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(fullTitle)}">
 <meta name="twitter:description" content="${esc(description)}">
-<meta name="twitter:image" content="${esc(SOCIAL_IMAGE)}">
+<meta name="twitter:image" content="${esc(image.url)}">
+<meta name="twitter:image:alt" content="${esc(image.alt)}">
+${head}
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fcfdfc">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#151b1a">
 <link rel="icon" href="${pre}assets/favicon.svg" type="image/svg+xml">
@@ -270,7 +279,7 @@ function resultSection(r, idx) {
     <h2 id="${id}">${esc(title)}</h2>
     <p class="badges">${resultBadges(r)} ${badge(`rerun-bench ${r.rerun_bench_version}`)}${r.lab.harness_commit ? " " + badge(`harness ${r.lab.harness_commit}`) : ""}</p>
     <p class="summary"><strong>In plain words:</strong> ${esc(plainSummary(r))}</p>
-    <p class="links"><a href="../data/results/${esc(r.file)}">Raw JSON</a>${r.lab.source_url ? ` &middot; <a href="${esc(r.lab.source_url)}">Run records, diffs and notes</a>` : ""}</p>
+    <p class="links"><a href="../data/results/${esc(r.file)}">Raw JSON</a>${r.lab.source_url ? ` &middot; <a href="${esc(r.lab.source_url)}">Run records, diffs and notes</a>` : ""}${findingFor(r) ? ` &middot; <a href="../${findingUrl(findingFor(r))}">Write-up: ${esc(findingFor(r).title)}</a>` : ""}</p>
   </header>
 
   <h3>Setup</h3>
@@ -622,6 +631,7 @@ function homePage() {
   <div class="tiles">${tiles}</div>
   ${metricKey(k)}
   <p class="verdict" role="note">${esc(overlapVerdict(es))}</p>
+  ${findingFor(latest) ? `<p class="finding-link"><strong>Write-up:</strong> <a href="${findingUrl(findingFor(latest))}">${esc(findingFor(latest).title)}</a></p>` : ""}
   <p><a class="more" href="results/">Full results, per-task grid and table view</a></p>
 </div>`;
   }
@@ -971,6 +981,182 @@ function launchesPage() {
   });
 }
 
+// ---------------------------------------------------------------- findings
+
+// Write-ups of one result set each, in plain first person. Numbers are read
+// from the result file, so the prose cannot drift from the data.
+const FINDINGS = [
+  {
+    slug: "2026-10-rerun-pilot",
+    result: "2026-10-03-pilot.json",
+    published: "2026-10-05",
+    title: "Same task, 3 runs: Codex passed and failed on 2 of 10 tasks, Claude Code on 0",
+    description:
+      "A 60-run pilot: Claude Code and Codex CLI on the same 10 coding tasks, 3 runs each. What reruns showed, the two Codex failures, and what 3 runs per task cannot show.",
+    image: { file: "findings/2026-10-rerun-pilot.png", w: 1200, h: 630 },
+  },
+];
+const findingFor = (r) => FINDINGS.find((f) => f.result === r.file);
+const findingUrl = (f) => `findings/${f.slug}/`;
+
+function pilotPost(f) {
+  const r = data.results.find((x) => x.file === f.result);
+  if (!r) throw new Error(`finding ${f.slug}: no result set ${f.result}`);
+  const es = r.entries.slice().sort(byName);
+  const cc = es.find((e) => e.agent === "claude");
+  const cx = es.find((e) => e.agent === "codex");
+  const m = { cc: cc.metrics, cx: cx.metrics };
+  const k = m.cc.k;
+  const flaky = Object.entries(m.cx.per_task).filter(([, t]) => t.outcomes.some(Boolean) && !t.outcomes.every(Boolean));
+  const flakyCc = Object.values(m.cc.per_task).filter((t) => t.outcomes.some(Boolean) && !t.outcomes.every(Boolean));
+  // The headline in the title, checked against the data on every build.
+  if (flaky.length !== 2 || flakyCc.length !== 0 || m.cx.n_tasks !== 10 || k !== 3) {
+    throw new Error(`finding ${f.slug}: the title no longer matches ${f.result}`);
+  }
+  const nTasks = m.cc.n_tasks;
+  const nRuns = m.cc.n_runs + m.cx.n_runs;
+  const allTasks = Object.keys(m.cc.per_task).sort().map((t) => taskById[t] || { id: t, title: t });
+  const flakyTasks = flaky.map(([t]) => taskById[t] || { id: t, title: t });
+  const repro = TOOLS.rerunBench;
+  const pilotDir = r.lab.source_url;
+
+  const rows = [
+    ["Runs passed", (x) => `${x.passes} of ${x.n_runs}`],
+    ["Pass rate, Wilson 95% interval", (x) => `${pct(x.pass_rate)} ${ci(x.pass_rate_ci95)}`],
+    [`pass@${k}: at least one of ${k} runs passes`, (x) => pct(x.pass_at_k)],
+    [`pass^${k}: all ${k} runs pass`, (x) => pct(x.pass_hat_k)],
+    ["Flip rate: two runs of a task disagree", (x) => pct(x.flip_rate)],
+    ["Tasks with both a pass and a fail", (x) => `${Math.round(x.flaky_task_fraction * x.n_tasks)} of ${x.n_tasks}`],
+  ];
+  const table = `<div class="tablewrap"><table class="data metrics post-table">
+<caption class="sr-only">Headline numbers for the pilot</caption>
+<thead><tr><th scope="col">Metric</th><th scope="col" class="num">Claude Code</th><th scope="col" class="num">Codex</th></tr></thead>
+<tbody>${rows.map(([name, fn]) => `<tr><th scope="row">${esc(name)}</th><td class="num">${esc(fn(m.cc))}</td><td class="num">${esc(fn(m.cx))}</td></tr>`).join("")}</tbody></table></div>`;
+
+  const body = `<article class="post" aria-labelledby="post-title">
+<header class="page-head post-head">
+  <p class="eyebrow"><span class="mono">${esc(f.published)}</span> <a href="../">Findings</a></p>
+  <h1 id="post-title">${esc(f.title)}</h1>
+  <p class="byline small">By Abel Yagubyan. Data: <a href="../../results/#r-${r.date}-${r.label}">the ${esc(r.date)} pilot</a> (<a href="../../data/results/${esc(r.file)}">raw JSON</a>, <a href="${esc(pilotDir)}">run records and diffs</a>).</p>
+</header>
+
+<p class="lede">On ${esc(r.date)} I gave Claude Code and Codex CLI the same ${nTasks} small coding tasks and ran each task ${k} times per agent, ${nRuns} runs in all. Claude Code passed all ${m.cc.n_runs} of its runs. Codex CLI passed ${m.cx.passes} of ${m.cx.n_runs}, and its two failures were on two different tasks that it passed on the other two tries. So for 2 of ${nTasks} tasks, whether Codex could do the task depended on which run you looked at. With only ${k} runs per task the two agents' pass-rate intervals overlap, so this pilot does not show that either one is more reliable than the other.</p>
+
+<h2 id="setup">What I ran</h2>
+<p>I build evaluation tools, and this pilot used one of them, <a href="${repro}">rerun-bench</a>. Each run starts from a fresh copy of the task's files, drives the agent's CLI headlessly, and is scored only by the task's own verifier script. The agent's exit code and its own claims of success are recorded but never scored.</p>
+<ul class="plain">
+  <li>Claude Code ${esc(cc.cli_version.replace(/ \(Claude Code\)$/, ""))} with its default model, which it reported as <code>${esc(cc.model)}</code>.</li>
+  <li>Codex CLI ${esc(cx.cli_version.replace(/^codex-cli /, ""))} with <code>${esc(cx.model)}</code>, the model that version picks when none is configured.</li>
+  <li>${nTasks} tasks, such as fixing the bug behind a failing test, implementing an LRU cache from its docstrings, renaming a function across a package, and following a repository's AGENTS.md. Runs were interleaved: run 0 of every task, then run 1, then run 2.</li>
+  <li>One Mac (${esc(r.lab.machine)}), between 08:16 and 08:25 UTC. Both agents ran at the same time, each one run at a time. Harness: rerun-bench ${esc(r.rerun_bench_version)} at commit ${esc(r.lab.harness_commit)}.</li>
+</ul>
+
+<h2 id="numbers">The numbers</h2>
+${intervalChart({
+  id: "post-ci",
+  title: "Pass rate with Wilson 95% interval",
+  desc: "The dot is the share of runs that passed; the bar is the 95% interval. The bars overlap.",
+  rows: es.map((e) => ({
+    label: entryLabel(e),
+    sub: e.model,
+    est: e.metrics.pass_rate,
+    lo: e.metrics.pass_rate_ci95[0],
+    hi: e.metrics.pass_rate_ci95[1],
+    tipNote: `${e.metrics.passes} of ${e.metrics.n_runs} runs passed`,
+  })),
+})}
+${table}
+${consistencyGrid({
+  id: "post-grid",
+  title: "Every run, by task",
+  desc: "Each mark is one run, in the order they ran. The two Codex CLI rows with a fail are the two flaky tasks.",
+  tasks: allTasks,
+  agents: es.map((e) => ({
+    label: entryLabel(e),
+    runs: k,
+    perTask: Object.fromEntries(Object.entries(e.metrics.per_task).map(([t, v]) => [t, v.outcomes])),
+  })),
+})}
+
+<h2 id="failures">The two Codex failures</h2>
+<p>I read both diffs against the verifiers. Neither failure came from a broken test or anything outside the agent, so no task was changed after the pilot.</p>
+<ul class="plain">
+  <li><strong><code>${esc(flakyTasks[0].id)}</code>, run 0.</strong> The docstring for <code>put</code> says to evict the least recently used key and return it. This run returned the evicted value instead (<code>_, evicted = self._items.popitem(last=False)</code>), and the verifier checks for the key. The other two runs returned the key. A plain agent error.</li>
+  <li><strong><code>${esc(flakyTasks[1].id)}</code>, run 1.</strong> Codex exited with status 0 after 8.7 seconds and about 42,000 tokens without changing any file. That version of the harness did not save the agent's output, so I do not know why. Three later runs of the same task, outside these results, all passed. rerun-bench now keeps the end of the agent's stdout and stderr with every run, so a failure like this can be diagnosed from the result files.</li>
+</ul>
+
+<h2 id="why">Why rerun the same task</h2>
+<p>Most coding-agent benchmarks score one attempt per task. If you run an agent once and act on what it did, the number that matters is closer to pass^${k}: the chance that all ${k} runs of a task pass. Here both agents have a pass@${k} of ${pct(m.cc.pass_at_k)}, so every task was solved at least once in ${k} tries. pass^${k} is ${pct(m.cc.pass_hat_k)} for Claude Code and ${pct(m.cx.pass_hat_k)} for Codex CLI, because the two flaky tasks drop out. The flip rate, the chance that two runs of the same task disagree, averaged over tasks, is ${pct(m.cc.flip_rate)} and ${pct(m.cx.flip_rate)}.</p>
+<p>Put another way: had I run each task once, Codex CLI could have scored ${nTasks - 2}, ${nTasks - 1} or ${nTasks} out of ${nTasks} on this suite depending on the draw, and a single-run table would have shown only one of those numbers.</p>
+
+<h2 id="limits">What this pilot cannot show</h2>
+<ul class="plain">
+  <li><strong>A difference between the agents.</strong> With ${k} runs per task, one failure moves a task's pass rate by 33 points. The pass-rate intervals are ${ciWords(m.cc.pass_rate_ci95)} for Claude Code and ${ciWords(m.cx.pass_rate_ci95)} for Codex CLI, and they overlap. The task-bootstrap interval for Codex's mean per-task pass rate is ${ciWords(m.cx.macro_pass_rate_task_bootstrap_ci95)}.</li>
+  <li><strong>Anything about large codebases.</strong> These are ${nTasks} small tasks I wrote, mostly in Python, each with a clear verifier.</li>
+  <li><strong>Stability over time.</strong> One machine, one morning, one CLI version each. Providers change models and CLIs often.</li>
+  <li><strong>Cost.</strong> Claude Code reports a list-price estimate (median ${usd(m.cc.median_cost_usd)} per run), which on a subscription login is quota, not money billed. Codex CLI reports tokens only, so there is no cost comparison.</li>
+</ul>
+
+<h2 id="reproduce">Reproduce it</h2>
+<p>A free run with a simulated agent shows the whole pipeline and spends nothing:</p>
+<div class="cmd"><pre><code>uvx rerun-bench run --agent mock --runs 5</code></pre><button type="button" class="copy" data-copy hidden aria-label="Copy the mock run command">Copy</button></div>
+<p>The pilot itself is one command per agent. These start real agent runs and spend your quota; drop <code>--yes</code> to see the run count and a cost estimate first.</p>
+<div class="cmd"><pre><code>uvx rerun-bench run --agent claude --runs 3 --yes
+uvx rerun-bench run --agent codex --model gpt-6-luna --runs 3 --yes
+uvx rerun-bench report results/</code></pre><button type="button" class="copy" data-copy hidden aria-label="Copy the pilot commands">Copy</button></div>
+<p>The <a href="${esc(pilotDir)}">pilot directory</a> has every run record and diff, and the <a href="../../methodology/">methodology page</a> defines each metric.</p>
+
+<h2 id="next-run">What I am running next</h2>
+<p>A larger run: about 30 tasks with 5 runs each. That gives per-task intervals that mean something, and enough data for the paired comparisons rerun-bench does not do yet: a Fisher exact test per task and a paired task-level bootstrap. It will be published here with its raw run records, like this pilot. To suggest an agent or a task, open an issue on the <a href="${repro}">repository</a>.</p>
+</article>`;
+
+  const url = `${SITE_URL}${findingUrl(f)}`;
+  return layout({
+    path: findingUrl(f),
+    title: f.title,
+    fullTitle: f.title,
+    description: f.description,
+    ogType: "article",
+    image: {
+      url: `${SITE_URL}assets/${f.image.file}`,
+      w: f.image.w,
+      h: f.image.h,
+      alt: `Result card for the ${r.date} pilot: Claude Code ${pct(m.cc.pass_rate)} ${ci(m.cc.pass_rate_ci95)}, pass^${k} ${pct(m.cc.pass_hat_k)}, flip rate ${pct(m.cc.flip_rate)}; Codex CLI ${pct(m.cx.pass_rate)} ${ci(m.cx.pass_rate_ci95)}, pass^${k} ${pct(m.cx.pass_hat_k)}, flip rate ${pct(m.cx.flip_rate)}. The 95% intervals overlap.`,
+    },
+    head: `<meta property="article:published_time" content="${esc(f.published)}">
+<meta property="article:author" content="Abel Yagubyan">
+<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: f.title,
+      description: f.description,
+      datePublished: f.published,
+      author: { "@type": "Person", name: "Abel Yagubyan" },
+      image: `${SITE_URL}assets/${f.image.file}`,
+      mainEntityOfPage: url,
+    }).replace(/</g, "\\u003c")}</script>`,
+    body,
+  });
+}
+
+function findingsIndex() {
+  const items = FINDINGS.slice()
+    .sort((a, b) => b.published.localeCompare(a.published))
+    .map((f) => `<li><span class="mono small">${esc(f.published)}</span> <a href="${f.slug}/">${esc(f.title)}</a><br><span class="small">${esc(f.description)}</span></li>`)
+    .join("");
+  return layout({
+    path: "findings/",
+    title: "Findings",
+    description: "Write-ups of result sets from open agent lab: what was run, what it shows, and what it cannot show.",
+    body: `<div class="page-head">
+  <p class="eyebrow"><span class="mono">06</span> Findings</p>
+  <h1>Findings</h1>
+  <p class="lede">Each finding is a short write-up of one result set: what was run, the numbers with their intervals, and what the data cannot show.</p>
+</div>
+<ul class="plain findings-list">${items}</ul>`,
+  });
+}
+
 function notFoundPage() {
   return layout({
     path: "404",
@@ -996,6 +1182,8 @@ write("methodology/index.html", methodologyPage());
 write("regressions/index.html", regressionsPage());
 write("launches/index.html", launchesPage());
 write("404.html", notFoundPage());
+write("findings/index.html", findingsIndex());
+for (const f of FINDINGS) write(`${findingUrl(f)}index.html`, pilotPost(f));
 write(".nojekyll", "");
 
 const copyDir = (from, to) => {
@@ -1009,4 +1197,4 @@ const copyDir = (from, to) => {
 copyDir(join(root, "src"), join(OUT, "assets"));
 if (existsSync(join(root, "data"))) copyDir(join(root, "data"), join(OUT, "data"));
 
-console.log(`built ${OUT.replace(root + "/", "")}: 6 pages, ${data.results.length} result set(s)`);
+console.log(`built ${OUT.replace(root + "/", "")}: ${7 + FINDINGS.length} pages, ${data.results.length} result set(s)`);

@@ -4,6 +4,11 @@ All notable changes to this project are listed here. Dates are UTC.
 
 ## Unreleased
 
+- Findings: a write-up of the 2026-10-03 pilot at `/findings/2026-10-rerun-pilot/` ("Same task,
+  3 runs: Codex passed and failed on 2 of 10 tasks, Claude Code on 0"), with its own canonical
+  URL, article metadata and a 1200x630 share card, and a `/findings/` index. The post's numbers
+  are read from the result file, and the build fails if its title stops matching the data. The
+  home page's latest result and the results page link to it.
 - This repository is a plugin marketplace named `open-agent-lab` for Claude Code
   (`.claude-plugin/marketplace.json`) and Codex (`.agents/plugins/marketplace.json`) that lists
   nerf-watch, snap-back, agent-fence and rerun-bench. Each packaged tool section on the home page

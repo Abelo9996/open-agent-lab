@@ -14,7 +14,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outRel = `.test-site-${process.pid}`;
 const out = join(root, outRel);
 const SITE_URL = "https://abelo9996.github.io/open-agent-lab/";
-const PAGES = ["index.html", "results/index.html", "methodology/index.html", "regressions/index.html", "launches/index.html", "404.html"];
+const POST = "findings/2026-10-rerun-pilot/index.html";
+const POST_TITLE = "Same task, 3 runs: Codex passed and failed on 2 of 10 tasks, Claude Code on 0";
+const PAGES = ["index.html", "results/index.html", "methodology/index.html", "regressions/index.html", "launches/index.html", "404.html", "findings/index.html", POST];
 const html = {};
 
 before(() => {
@@ -146,14 +148,16 @@ test("every page ends with something to do", () => {
 });
 
 test("each chart and pass/fail grid is a single tab stop", () => {
-  const r = html["results/index.html"];
-  const groups = r.split(/(?=<div class="cbody" role="list" data-rove>|<table class="grid-table" data-rove>)/).slice(1);
-  assert.ok(groups.length >= 5, `expected charts and a grid, found ${groups.length}`);
-  for (const g of groups) {
-    const end = g.indexOf(g.startsWith("<table") ? "</table>" : '<div class="crow crow-axis"');
-    const body = g.slice(0, end);
-    assert.equal((body.match(/tabindex="0"/g) || []).length, 1, body.slice(0, 80));
-    assert.ok((body.match(/tabindex="-1"/g) || []).length >= 1);
+  for (const [page, min] of [["results/index.html", 5], [POST, 2]]) {
+    const r = html[page];
+    const groups = r.split(/(?=<div class="cbody" role="list" data-rove>|<table class="grid-table" data-rove>)/).slice(1);
+    assert.ok(groups.length >= min, `${page}: expected charts and a grid, found ${groups.length}`);
+    for (const g of groups) {
+      const end = g.indexOf(g.startsWith("<table") ? "</table>" : '<div class="crow crow-axis"');
+      const body = g.slice(0, end);
+      assert.equal((body.match(/tabindex="0"/g) || []).length, 1, body.slice(0, 80));
+      assert.ok((body.match(/tabindex="-1"/g) || []).length >= 1);
+    }
   }
 });
 
@@ -166,4 +170,54 @@ test("no aria-label on elements without a role, and every image has alt text", (
 
 test("built pages contain no long dashes", () => {
   for (const p of PAGES) assert.doesNotMatch(html[p], /[–—]/, p);
+});
+
+test("the findings post stands on its own: title, canonical URL and a dedicated share card", () => {
+  const p = html[POST];
+  const url = `${SITE_URL}findings/2026-10-rerun-pilot/`;
+  assert.ok(p.includes(`<title>${POST_TITLE}</title>`), "title is the post title alone, without the site suffix");
+  assert.ok(p.includes(`<h1 id="post-title">${POST_TITLE}</h1>`));
+  assert.ok(POST_TITLE.length <= 80, "Hacker News titles are capped at 80 characters");
+  assert.ok(p.includes(`<link rel="canonical" href="${url}">`));
+  assert.ok(p.includes(`<meta property="og:url" content="${url}">`));
+  assert.ok(p.includes('<meta property="og:type" content="article">'));
+  const img = `${SITE_URL}assets/findings/2026-10-rerun-pilot.png`;
+  assert.ok(p.includes(`<meta property="og:image" content="${img}">`));
+  assert.ok(p.includes(`<meta name="twitter:image" content="${img}">`));
+  assert.ok(p.includes('<meta property="og:image:width" content="1200">'));
+  assert.ok(p.includes('<meta property="og:image:height" content="630">'));
+  assert.ok(p.includes('<meta name="twitter:card" content="summary_large_image">'));
+  // The card on disk really is 1200x630 (PNG IHDR width and height).
+  const png = readFileSync(join(out, "assets", "findings", "2026-10-rerun-pilot.png"));
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.equal(png.readUInt32BE(20), 630);
+  const ld = JSON.parse(p.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)[1]);
+  assert.equal(ld.headline, POST_TITLE);
+  assert.equal(ld.mainEntityOfPage, url);
+});
+
+test("the findings post is 600 to 900 words of prose and says what the pilot cannot show", () => {
+  let a = html[POST].slice(html[POST].indexOf("<article"), html[POST].indexOf("</article>"));
+  for (const re of [/<figure[\s\S]*?<\/figure>/g, /<div class="tablewrap">[\s\S]*?<\/div>/g, /<div class="cmd">[\s\S]*?<\/div>/g]) a = a.replace(re, "");
+  const words = a.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  assert.ok(words >= 600 && words <= 900, `${words} words`);
+  const p = html[POST];
+  for (const id of ["setup", "numbers", "failures", "why", "limits", "reproduce", "next-run"]) assert.ok(ids(p).has(id), id);
+  assert.match(p, /Claude Code 2\.1\.288/);
+  assert.match(p, /Codex CLI 0\.160\.0/);
+  assert.match(p, /<code>claude-opus-5-5<\/code>/);
+  assert.match(p, /<code>gpt-6-luna<\/code>/);
+  assert.match(p, /89% to 100% for Claude Code and 79% to 98% for Codex CLI, and they overlap/);
+  assert.match(p, /pass\^3 is 100% for Claude Code and 80% for Codex CLI/);
+  assert.match(p, /<code>implement-lru-cache<\/code>, run 0/);
+  assert.match(p, /<code>refactor-extract-helper<\/code>, run 1/);
+  assert.match(p, /uvx rerun-bench run --agent mock --runs 5/);
+  assert.match(p, /about 30 tasks with 5 runs each/);
+  assert.doesNotMatch(p, /\b(best|winner|beats|groundbreaking|revolutionary)\b/i);
+});
+
+test("the findings post is linked from the home page, the results page and the findings index", () => {
+  assert.match(html["index.html"], /href="findings\/2026-10-rerun-pilot\/"/);
+  assert.match(html["results/index.html"], /href="\.\.\/findings\/2026-10-rerun-pilot\/"/);
+  assert.match(html["findings/index.html"], /href="2026-10-rerun-pilot\/"/);
 });
