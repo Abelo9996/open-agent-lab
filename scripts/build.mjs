@@ -467,6 +467,9 @@ function heroPanel(r) {
 </figure>`;
 }
 
+/** GitHub repository that holds the Claude Code and Codex plugin marketplaces for the tools. */
+const MARKETPLACE = "Abelo9996/open-agent-lab";
+
 const TOOL_LIST = [
   {
     id: "nerf-watch",
@@ -475,6 +478,7 @@ const TOOL_LIST = [
     outcome: "Find out when your coding agent quietly got worse or more expensive.",
     install: "npx nerf-watch check",
     brew: "brew install abelo9996/tap/nerf-watch",
+    plugin: "nerf-watch@open-agent-lab",
     then: "Needs Node.js 20 or newer. Then <code>npx nerf-watch share</code> prints an anonymized report for the <a href=\"regressions/\">regression watch</a>.",
     facts: [
       "Reads the session logs Claude Code and Codex already write on your machine. Nothing is uploaded.",
@@ -491,6 +495,7 @@ const TOOL_LIST = [
     outcome: "Run the same coding task N times per agent and see how often it passes, how often it flips, and how much the bill varies.",
     install: "uvx rerun-bench run --agent mock",
     brew: "brew install abelo9996/tap/rerun-bench",
+    plugin: "rerun-bench@open-agent-lab",
     then: "Needs <a href=\"https://docs.astral.sh/uv/\">uv</a>. The mock agent is free and finishes in seconds. <code>--agent claude</code>, <code>codex</code> or <code>opencode</code> drives a real CLI and spends credit. To keep it installed: <code>uv tool install rerun-bench</code>.",
     facts: [
       "Each run starts from a fresh temporary copy of the task, and passes only if the task's verifier exits 0.",
@@ -507,6 +512,7 @@ const TOOL_LIST = [
     outcome: "Roll back whatever a coding agent did to your files with one command, without touching your own git history.",
     install: "npx @abelo9996/snap-back wrap -- codex",
     brew: "brew install abelo9996/tap/snap-back",
+    plugin: "snap-back@open-agent-lab",
     then: "Runs Codex with snapshots on; put any agent command after <code>--</code>. Then <code>npx @abelo9996/snap-back undo</code> rolls its changes back. For everyday use: <code>npm install -g @abelo9996/snap-back</code>. Needs Node.js 20 or newer.",
     facts: [
       "Snapshots the project into a separate shadow git repository; your own <code>.git</code> is never read or written.",
@@ -523,6 +529,7 @@ const TOOL_LIST = [
     outcome: "One policy file decides what every coding agent on your machine may run, read and write, and logs everything it tried.",
     install: "npm install -g @abelo9996/agent-fence",
     brew: "brew install abelo9996/tap/agent-fence",
+    plugin: "agent-fence@open-agent-lab",
     then: "Then, in a project: <code>agent-fence init</code> writes a commented starter policy, and <code>agent-fence hooks install --agent claude</code> enforces it in Claude Code. Needs Node.js 20 or newer.",
     facts: [
       "Allow, ask or deny shell commands, file access and git operations from one <code>.agent-fence.toml</code>.",
@@ -559,6 +566,7 @@ function toolSection(t, i) {
     <div class="cmd"><pre><code>${esc(t.install)}</code></pre><button type="button" class="copy" data-copy hidden aria-label="Copy the ${t.id} command">Copy</button></div>
     ${t.then ? `<p class="cmd-then small">${t.then}</p>` : ""}
     ${t.brew ? `<p class="cmd-brew small">Homebrew (macOS and Linux): <code>${esc(t.brew)}</code></p>` : ""}
+    ${t.plugin ? `<p class="cmd-plugin small">Claude Code plugin: <code>/plugin install ${esc(t.plugin)}</code> after <code>/plugin marketplace add ${MARKETPLACE}</code>. Codex: <code>codex plugin add ${esc(t.plugin)}</code> from the same marketplace.</p>` : ""}
     <ul class="facts">${t.facts.map((f) => `<li>${f}</li>`).join("")}</ul>
     <p class="tool-role">${esc(t.role)}</p>
     <p class="tool-links"><a class="go" href="${t.url}">Repository</a> <a class="go" href="${t.url}/blob/main/README.md">README</a></p>

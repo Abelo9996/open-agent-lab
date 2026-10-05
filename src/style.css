@@ -1742,7 +1742,8 @@ ul.facts li::before {
   margin: -0.5rem 0 1.1rem;
   color: var(--ink-2);
 }
-.cmd-brew {
+.cmd-brew,
+.cmd-plugin {
   max-width: 34rem;
   margin: -0.6rem 0 1.1rem;
   color: var(--ink-2);

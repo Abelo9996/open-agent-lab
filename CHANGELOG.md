@@ -2,6 +2,13 @@
 
 All notable changes to this project are listed here. Dates are UTC.
 
+## Unreleased
+
+- This repository is a plugin marketplace named `open-agent-lab` for Claude Code
+  (`.claude-plugin/marketplace.json`) and Codex (`.agents/plugins/marketplace.json`) that lists
+  nerf-watch, snap-back, agent-fence and rerun-bench. Each packaged tool section on the home page
+  shows its plugin install line, and the README has an install section.
+
 ## 0.1.1 (2026-10-04)
 
 - Install commands on the home page now match the published packages and work as pasted:

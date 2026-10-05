@@ -1,0 +1,30 @@
+{
+  "name": "open-agent-lab",
+  "interface": { "displayName": "open-agent-lab" },
+  "plugins": [
+    {
+      "name": "nerf-watch",
+      "source": { "source": "url", "url": "https://github.com/Abelo9996/nerf-watch.git" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "snap-back",
+      "source": { "source": "url", "url": "https://github.com/Abelo9996/snap-back.git" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "agent-fence",
+      "source": { "source": "url", "url": "https://github.com/Abelo9996/agent-fence.git" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    },
+    {
+      "name": "rerun-bench",
+      "source": { "source": "url", "url": "https://github.com/Abelo9996/rerun-bench.git" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    }
+  ]
+}

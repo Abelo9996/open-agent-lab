@@ -82,6 +82,33 @@ test("packaged tools show their Homebrew tap install line", () => {
   ]);
 });
 
+test("packaged tools show the plugin install line for the open-agent-lab marketplace", () => {
+  const lines = [...html["index.html"].matchAll(/<p class="cmd-plugin small">Claude Code plugin: <code>\/plugin install ([^<]+)<\/code> after <code>\/plugin marketplace add ([^<]+)<\/code>\. Codex: <code>codex plugin add ([^<]+)<\/code> from the same marketplace\.<\/p>/g)];
+  assert.deepEqual(
+    lines.map((m) => m[1]),
+    ["nerf-watch@open-agent-lab", "rerun-bench@open-agent-lab", "snap-back@open-agent-lab", "agent-fence@open-agent-lab"],
+  );
+  for (const m of lines) {
+    assert.equal(m[2], "Abelo9996/open-agent-lab");
+    assert.equal(m[3], m[1]);
+  }
+});
+
+test("the plugin marketplaces list the four packaged tools", () => {
+  const claude = JSON.parse(readFileSync(join(root, ".claude-plugin", "marketplace.json"), "utf8"));
+  const codex = JSON.parse(readFileSync(join(root, ".agents", "plugins", "marketplace.json"), "utf8"));
+  const names = ["agent-fence", "nerf-watch", "rerun-bench", "snap-back"];
+  assert.equal(claude.name, "open-agent-lab");
+  assert.equal(codex.name, "open-agent-lab");
+  assert.deepEqual(claude.plugins.map((p) => p.name).sort(), names);
+  assert.deepEqual(codex.plugins.map((p) => p.name).sort(), names);
+  for (const p of claude.plugins) assert.deepEqual(p.source, { source: "github", repo: `Abelo9996/${p.name}` });
+  for (const p of codex.plugins) {
+    assert.deepEqual(p.source, { source: "url", url: `https://github.com/Abelo9996/${p.name}.git` });
+    assert.equal(p.policy.installation, "AVAILABLE");
+  }
+});
+
 test("every tool section names a next step after its first command", () => {
   const thens = html["index.html"].match(/<p class="cmd-then small">/g) || [];
   assert.equal(thens.length, 5);

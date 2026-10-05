@@ -1,0 +1,35 @@
+{
+  "name": "open-agent-lab",
+  "owner": { "name": "Abel Yagubyan", "url": "https://github.com/Abelo9996" },
+  "description": "Tools from the open-agent-lab: catch silent agent regressions, undo what an agent changed, enforce one permission policy, and measure run-to-run consistency.",
+  "plugins": [
+    {
+      "name": "nerf-watch",
+      "source": { "source": "github", "repo": "Abelo9996/nerf-watch" },
+      "description": "Find out when your coding agent quietly got worse or more expensive. Adds /nerf-watch:check and /nerf-watch:share.",
+      "category": "monitoring",
+      "tags": ["regression", "cost", "tokens", "session-logs"]
+    },
+    {
+      "name": "snap-back",
+      "source": { "source": "github", "repo": "Abelo9996/snap-back" },
+      "description": "Undo for coding agents: snapshots before each prompt and around every file-changing tool call. Adds /snap-back:undo, /snap-back:list and /snap-back:status.",
+      "category": "safety",
+      "tags": ["undo", "checkpoint", "snapshot", "hooks"]
+    },
+    {
+      "name": "agent-fence",
+      "source": { "source": "github", "repo": "Abelo9996/agent-fence" },
+      "description": "One permission policy for coding agents, enforced by a PreToolUse hook. Adds /agent-fence:explain and /agent-fence:log.",
+      "category": "security",
+      "tags": ["permissions", "policy", "audit", "hooks"]
+    },
+    {
+      "name": "rerun-bench",
+      "source": { "source": "github", "repo": "Abelo9996/rerun-bench" },
+      "description": "Run the same coding tasks N times per agent and measure pass^k, flip rate and cost spread. Adds /rerun-bench:run-mock and /rerun-bench:report.",
+      "category": "evaluation",
+      "tags": ["benchmark", "reliability", "consistency"]
+    }
+  ]
+}

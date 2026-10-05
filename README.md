@@ -58,6 +58,36 @@ linked by name: [#nerf-watch](https://abelo9996.github.io/open-agent-lab/#nerf-w
 [#agent-fence](https://abelo9996.github.io/open-agent-lab/#agent-fence),
 [#launch-day-kit](https://abelo9996.github.io/open-agent-lab/#launch-day-kit).
 
+## Install the tools as agent plugins
+
+This repository is a plugin marketplace for Claude Code and Codex. Add it once, then install
+the tools you want from inside the agent.
+
+Claude Code:
+
+```text
+/plugin marketplace add Abelo9996/open-agent-lab
+/plugin install nerf-watch@open-agent-lab
+/plugin install snap-back@open-agent-lab
+/plugin install agent-fence@open-agent-lab
+/plugin install rerun-bench@open-agent-lab
+```
+
+Codex:
+
+```sh
+codex plugin marketplace add Abelo9996/open-agent-lab
+codex plugin add nerf-watch@open-agent-lab   # also snap-back, agent-fence, rerun-bench
+```
+
+Each plugin brings the tool's skill. In Claude Code they also add slash commands
+(`/nerf-watch:check`, `/nerf-watch:share`, `/snap-back:undo`, `/snap-back:list`,
+`/snap-back:status`, `/agent-fence:explain`, `/agent-fence:log`, `/rerun-bench:run-mock`,
+`/rerun-bench:report`), and snap-back and agent-fence ship their hooks, so no settings file is
+edited. The agent-fence Codex plugin ships its hook too, which Codex runs after you trust it in
+`/hooks`. The plugins run each CLI through `npx` or `uvx`; each tool's README covers the
+details. The catalogs are `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
+
 ## Add a result set
 
 1. Run rerun-bench with at least 3 runs per task (for example
