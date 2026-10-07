@@ -1236,7 +1236,7 @@ function tenRunPost(f) {
   <p class="byline small">By Abel Yagubyan. Data: <a href="../../results/#r-${r.date}-${r.label}">the ${esc(r.date)} result set</a> (<a href="../../data/results/${esc(r.file)}">raw JSON</a>, <a href="${esc(srcDir)}">run records and diffs</a>).</p>
 </header>
 
-<p class="lede">I gave Claude Code and Codex CLI the same ${nTasks} small coding tasks and ran each task ${k} times per agent, ${nRuns} runs in all. Claude Code passed all ${m.cc.n_runs}. Codex CLI passed ${m.cx.passes}, and its ${m.cx.n_runs - m.cx.passes} failures were all the same kind: it read the file, changed nothing, and exited cleanly within 10 seconds. In 3 of those 4 runs its last message said it had made the change. The overall pass rates are too close to call; the way Codex failed is the finding.</p>
+<p class="lede">I gave Claude Code and Codex CLI the same ${nTasks} small coding tasks and ran each task ${k} times per agent, ${nRuns} runs in all. Claude Code passed all ${m.cc.n_runs}. Codex CLI passed ${m.cx.passes}, and its ${m.cx.n_runs - m.cx.passes} failures were all the same kind: it read the file, changed nothing, and exited cleanly within 10 seconds. In 3 of those 4 runs its last message said it had made the change. The overall pass rates are too close to call. How Codex failed is the part worth reading.</p>
 
 <h2 id="setup">What I ran</h2>
 <p>This is the follow-up to <a href="../${pilot.slug}/">a 60-run pilot</a>, with ${k} runs per task instead of 3, using <a href="${repro}">rerun-bench</a>, an evaluation tool I build. Each run starts from a fresh copy of the task's files, drives the agent's CLI headlessly, and is scored only by the task's own verifier script. What the agent says about its work is recorded but never scored.</p>
@@ -1275,10 +1275,10 @@ ${consistencyGrid({
 })}
 
 <h2 id="failures">How Codex failed</h2>
-<p>All ${TEN_RUN_FAILURES.length} failures look alike. Codex listed or printed the relevant file, issued no edit, and exited with status 0 after 7 to 10 seconds, writing 115 to 205 output tokens against a median of ${Math.round(m.cx.output_tokens_median)} across all its runs. The recorded diffs are empty and the verifiers failed on the unchanged code. None of these were hard tasks for it: it passed each of them on most of its other runs.</p>
+<p>The ${TEN_RUN_FAILURES.length} failures look almost identical. Codex listed or printed the relevant file, issued no edit, and exited with status 0 after 7 to 10 seconds, writing 115 to 205 output tokens against a median of ${Math.round(m.cx.output_tokens_median)} across all its runs. The recorded diffs are empty and the verifiers failed on the unchanged code. These weren't hard tasks for it. It passed each of them on most of its other runs.</p>
 ${failTable}
-<p>A failure the agent reports is cheap: you see it and retry. A failure the agent reports as a success is the expensive kind, because you only find it when something downstream breaks. In a normal session, three of these four runs would have looked finished.</p>
-<p>The pilot had one unexplained Codex failure, on <code>refactor-extract-helper</code>: exit 0 after 8.7 seconds, no file changed. That harness version did not keep the agent's output, so I could not say why. It now looks like the same behavior.</p>
+<p>When an agent tells you it failed, you just try again. When it tells you it succeeded and didn't, you usually find out later, when something else breaks. Three of these four runs would have looked finished to me if I hadn't been checking the files.</p>
+<p>The pilot had one unexplained Codex failure, on <code>refactor-extract-helper</code>: exit 0 after 8.7 seconds, no file changed. That harness version did not keep the agent's output, so I could not say why. In hindsight it looks like the same thing.</p>
 
 <h2 id="why">Why ${k} runs changed the picture</h2>
 <p>With 3 runs per task, the pilot had two Codex failures that looked unrelated. With ${k}, the pattern is visible: ${pct(m.cx.pass_hat_k)} of tasks passed all ${k} times for Codex CLI, against ${pct(m.cc.pass_hat_k)} for Claude Code, and the flip rate was ${pct(m.cx.flip_rate)} against ${pct(m.cc.flip_rate)}. Had I run each task once, Codex CLI would have scored ${nTasks} out of ${nTasks} about ${pct(oneShotAll)} of the time on these per-task rates, and this behavior would not have shown up at all.</p>
