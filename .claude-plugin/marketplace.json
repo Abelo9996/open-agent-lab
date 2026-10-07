@@ -6,7 +6,7 @@
     {
       "name": "nerf-watch",
       "source": { "source": "github", "repo": "Abelo9996/nerf-watch" },
-      "description": "Find out when your coding agent quietly got worse or more expensive. Adds /nerf-watch:check and /nerf-watch:share.",
+      "description": "Find out when your coding agent quietly got worse or more expensive. Adds /nerf-watch:check, /nerf-watch:share and /nerf-watch:phantom (edits the agent claimed but never made).",
       "category": "monitoring",
       "tags": ["regression", "cost", "tokens", "session-logs"]
     },
