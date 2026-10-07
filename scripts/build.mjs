@@ -640,7 +640,8 @@ function homePage() {
     path: "",
     title: "Home",
     description: "Independent, reproducible evaluation of coding agents. Same tasks, many runs, intervals shown.",
-    body: `<section class="hero">
+    // With many runs per task the hero panel is too wide to sit beside the text.
+    body: `<section class="hero${latest && latest.entries.reduce((n, e) => n + (e.metrics.k || 0), 0) > 12 ? " hero-wide" : ""}">
   <div class="hero-text">
     <p class="eyebrow"><span class="mono">01</span> open agent lab</p>
     <h1>Coding agents, measured more than once.</h1>
@@ -994,6 +995,17 @@ const FINDINGS = [
     description:
       "A 60-run pilot: Claude Code and Codex CLI on the same 10 coding tasks, 3 runs each. What reruns showed, the two Codex failures, and what 3 runs per task cannot show.",
     image: { file: "findings/2026-10-rerun-pilot.png", w: 1200, h: 630 },
+    render: pilotPost,
+  },
+  {
+    slug: "2026-10-rerun-10x",
+    result: "2026-10-06-rerun-10x.json",
+    published: "2026-10-07",
+    title: "Same task, 10 runs: Codex CLI reported edits it never made in 3 of 100 runs",
+    description:
+      "200 runs: Claude Code and Codex CLI on the same 10 coding tasks, 10 runs each. Claude Code passed all 100. Codex passed 96, and all 4 failures were clean exits with no file changed.",
+    image: { file: "findings/2026-10-rerun-10x.png", w: 1200, h: 630 },
+    render: tenRunPost,
   },
 ];
 const findingFor = (r) => FINDINGS.find((f) => f.result === r.file);
@@ -1139,6 +1151,169 @@ uvx rerun-bench report results/</code></pre><button type="button" class="copy" d
   });
 }
 
+// Shared <head> metadata and layout for a findings post.
+function postLayout(f, alt, body) {
+  const url = `${SITE_URL}${findingUrl(f)}`;
+  return layout({
+    path: findingUrl(f),
+    title: f.title,
+    fullTitle: f.title,
+    description: f.description,
+    ogType: "article",
+    image: { url: `${SITE_URL}assets/${f.image.file}`, w: f.image.w, h: f.image.h, alt },
+    head: `<meta property="article:published_time" content="${esc(f.published)}">
+<meta property="article:author" content="Abel Yagubyan">
+<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: f.title,
+      description: f.description,
+      datePublished: f.published,
+      author: { "@type": "Person", name: "Abel Yagubyan" },
+      image: `${SITE_URL}assets/${f.image.file}`,
+      mainEntityOfPage: url,
+    }).replace(/</g, "\\u003c")}</script>`,
+    body,
+  });
+}
+
+// The 4 Codex failures, read from agent_stdout_tail in the source run records.
+// `said` is what the final agent message claimed; null when it claimed nothing.
+const TEN_RUN_FAILURES = [
+  { task: "add-cli-flag", run: 5, wall: "7.0", said: "Added `--words` to wc.py. It counts whitespace-separated tokens and keeps the existing output format" },
+  { task: "refactor-extract-helper", run: 7, wall: "9.9", said: "Extracted the existing clamp logic into `clamp_percent(percent)` and updated all three pricing functions to use it." },
+  { task: "refactor-extract-helper", run: 9, wall: "8.9", said: "Extracted the repeated clamp into `clamp_percent(percent)` and updated all three pricing functions to use it." },
+  { task: "implement-slugify", run: 7, wall: "8.3", said: null },
+];
+
+function tenRunPost(f) {
+  const r = data.results.find((x) => x.file === f.result);
+  if (!r) throw new Error(`finding ${f.slug}: no result set ${f.result}`);
+  const es = r.entries.slice().sort(byName);
+  const cc = es.find((e) => e.agent === "claude");
+  const cx = es.find((e) => e.agent === "codex");
+  const m = { cc: cc.metrics, cx: cx.metrics };
+  const k = m.cc.k;
+  const failsOf = (x) => Object.entries(x.per_task).flatMap(([t, v]) => v.outcomes.map((ok, i) => (ok ? null : `${t}#${i}`)).filter(Boolean));
+  const cxFails = failsOf(m.cx).sort();
+  const listed = TEN_RUN_FAILURES.map((x) => `${x.task}#${x.run}`).sort();
+  // The title and the failure list, checked against the data on every build.
+  if (k !== 10 || m.cc.n_tasks !== 10 || failsOf(m.cc).length !== 0 || cxFails.join() !== listed.join() || TEN_RUN_FAILURES.filter((x) => x.said).length !== 3) {
+    throw new Error(`finding ${f.slug}: the title or failure list no longer matches ${f.result}`);
+  }
+  const nTasks = m.cc.n_tasks;
+  const nRuns = m.cc.n_runs + m.cx.n_runs;
+  const allTasks = Object.keys(m.cc.per_task).sort().map((t) => taskById[t] || { id: t, title: t });
+  const flaky = Object.entries(m.cx.per_task).filter(([, t]) => t.outcomes.some(Boolean) && !t.outcomes.every(Boolean));
+  const repro = TOOLS.rerunBench;
+  const srcDir = r.lab.source_url;
+  const pilot = FINDINGS[0];
+  // Chance that one run per task passes every task, from the per-task pass rates.
+  const oneShotAll = Object.values(m.cx.per_task).reduce((a, t) => a * (t.outcomes.filter(Boolean).length / t.outcomes.length), 1);
+
+  const rows = [
+    ["Runs passed", (x) => `${x.passes} of ${x.n_runs}`],
+    ["Pass rate, Wilson 95% interval", (x) => `${pct(x.pass_rate)} ${ci(x.pass_rate_ci95)}`],
+    [`pass^${k}: all ${k} runs pass`, (x) => pct(x.pass_hat_k)],
+    ["Flip rate: two runs of a task disagree", (x) => pct(x.flip_rate)],
+    ["Tasks with both a pass and a fail", (x) => `${Math.round(x.flaky_task_fraction * x.n_tasks)} of ${x.n_tasks}`],
+    ["Median wall time per run", (x) => `${x.wall_time_median_s.toFixed(1)} s`],
+  ];
+  const table = `<div class="tablewrap"><table class="data metrics post-table">
+<caption class="sr-only">Headline numbers for the 10-run set</caption>
+<thead><tr><th scope="col">Metric</th><th scope="col" class="num">Claude Code</th><th scope="col" class="num">Codex</th></tr></thead>
+<tbody>${rows.map(([name, fn]) => `<tr><th scope="row">${esc(name)}</th><td class="num">${esc(fn(m.cc))}</td><td class="num">${esc(fn(m.cx))}</td></tr>`).join("")}</tbody></table></div>`;
+  const mdCode = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+  const failTable = `<div class="tablewrap"><table class="data post-table">
+<caption class="sr-only">The four Codex CLI failures</caption>
+<thead><tr><th scope="col">Task</th><th scope="col" class="num">Run</th><th scope="col" class="num">Time</th><th scope="col">What its final message said</th></tr></thead>
+<tbody>${TEN_RUN_FAILURES.map((x) => `<tr><th scope="row"><code>${esc(x.task)}</code></th><td class="num">${x.run}</td><td class="num">${x.wall} s</td><td>${x.said ? `&ldquo;${mdCode(x.said)}&rdquo;` : "That it had read the spec and would now implement it. It then exited."}</td></tr>`).join("")}</tbody></table></div>`;
+
+  const body = `<article class="post" aria-labelledby="post-title">
+<header class="page-head post-head">
+  <p class="eyebrow"><span class="mono">${esc(f.published)}</span> <a href="../">Findings</a></p>
+  <h1 id="post-title">${esc(f.title)}</h1>
+  <p class="byline small">By Abel Yagubyan. Data: <a href="../../results/#r-${r.date}-${r.label}">the ${esc(r.date)} result set</a> (<a href="../../data/results/${esc(r.file)}">raw JSON</a>, <a href="${esc(srcDir)}">run records and diffs</a>).</p>
+</header>
+
+<p class="lede">I gave Claude Code and Codex CLI the same ${nTasks} small coding tasks and ran each task ${k} times per agent, ${nRuns} runs in all. Claude Code passed all ${m.cc.n_runs}. Codex CLI passed ${m.cx.passes}, and its ${m.cx.n_runs - m.cx.passes} failures were all the same kind: it read the file, changed nothing, and exited cleanly within 10 seconds. In 3 of those 4 runs its last message said it had made the change. The overall pass rates are too close to call; the way Codex failed is the finding.</p>
+
+<h2 id="setup">What I ran</h2>
+<p>This is the follow-up to <a href="../${pilot.slug}/">a 60-run pilot</a>, with ${k} runs per task instead of 3, using <a href="${repro}">rerun-bench</a>, an evaluation tool I build. Each run starts from a fresh copy of the task's files, drives the agent's CLI headlessly, and is scored only by the task's own verifier script. What the agent says about its work is recorded but never scored.</p>
+<ul class="plain">
+  <li>Claude Code ${esc(cc.cli_version.replace(/ \(Claude Code\)$/, ""))}, pinned to <code>${esc(cc.model)}</code>.</li>
+  <li>Codex CLI ${esc(cx.cli_version.replace(/^codex-cli /, ""))} with <code>${esc(cx.model)}</code>, the model that version picks when none is configured.</li>
+  <li>The same ${nTasks} tasks as the pilot: fixing the bug behind a failing test, implementing a function from its docstring, renaming across a package, extracting a helper, and so on.</li>
+  <li>One Mac (${esc(r.lab.machine)}). Codex ran on the afternoon of ${esc(r.date)} and Claude Code that evening, US Eastern time. Harness: rerun-bench ${esc(r.rerun_bench_version)} at commit ${esc(r.lab.harness_commit)}.</li>
+</ul>
+
+<h2 id="numbers">The numbers</h2>
+${intervalChart({
+  id: "post-ci",
+  title: "Pass rate with Wilson 95% interval",
+  desc: "The dot is the share of runs that passed; the bar is the 95% interval. The bars overlap.",
+  rows: es.map((e) => ({
+    label: entryLabel(e),
+    sub: e.model,
+    est: e.metrics.pass_rate,
+    lo: e.metrics.pass_rate_ci95[0],
+    hi: e.metrics.pass_rate_ci95[1],
+    tipNote: `${e.metrics.passes} of ${e.metrics.n_runs} runs passed`,
+  })),
+})}
+${table}
+${consistencyGrid({
+  id: "post-grid",
+  title: "Every run, by task",
+  desc: `Each mark is one run, in the order they ran. Codex CLI has a fail on ${flaky.length} tasks.`,
+  tasks: allTasks,
+  agents: es.map((e) => ({
+    label: entryLabel(e),
+    runs: k,
+    perTask: Object.fromEntries(Object.entries(e.metrics.per_task).map(([t, v]) => [t, v.outcomes])),
+  })),
+})}
+
+<h2 id="failures">How Codex failed</h2>
+<p>All ${TEN_RUN_FAILURES.length} failures look alike. Codex listed or printed the relevant file, issued no edit, and exited with status 0 after 7 to 10 seconds, writing 115 to 205 output tokens against a median of ${Math.round(m.cx.output_tokens_median)} across all its runs. The recorded diffs are empty and the verifiers failed on the unchanged code. None of these were hard tasks for it: it passed each of them on most of its other runs.</p>
+${failTable}
+<p>A failure the agent reports is cheap: you see it and retry. A failure the agent reports as a success is the expensive kind, because you only find it when something downstream breaks. In a normal session, three of these four runs would have looked finished.</p>
+<p>The pilot had one unexplained Codex failure, on <code>refactor-extract-helper</code>: exit 0 after 8.7 seconds, no file changed. That harness version did not keep the agent's output, so I could not say why. It now looks like the same behavior.</p>
+
+<h2 id="why">Why ${k} runs changed the picture</h2>
+<p>With 3 runs per task, the pilot had two Codex failures that looked unrelated. With ${k}, the pattern is visible: ${pct(m.cx.pass_hat_k)} of tasks passed all ${k} times for Codex CLI, against ${pct(m.cc.pass_hat_k)} for Claude Code, and the flip rate was ${pct(m.cx.flip_rate)} against ${pct(m.cc.flip_rate)}. Had I run each task once, Codex CLI would have scored ${nTasks} out of ${nTasks} about ${pct(oneShotAll)} of the time on these per-task rates, and this behavior would not have shown up at all.</p>
+
+<h2 id="default-model">A side result: the default model changed</h2>
+<p>In the pilot, Claude Code with no model flag reported <code>claude-opus-5-5</code>. Three days later, on the same account and even with the pilot's CLI version, it reported <code>claude-opus-4-8</code>. I do not know why. I pinned the model for the comparison above, and also ran ${k} runs per task on the new default: it passed all 100, at a median ${usd(0.1312)} per run against ${usd(m.cc.median_cost_usd)} for the pinned model. Those runs are in the <a href="${esc(srcDir)}">source directory</a>.</p>
+
+<h2 id="limits">What this cannot show</h2>
+<ul class="plain">
+  <li><strong>A difference in overall pass rate.</strong> The intervals are ${ciWords(m.cc.pass_rate_ci95)} for Claude Code and ${ciWords(m.cx.pass_rate_ci95)} for Codex CLI, and they overlap.</li>
+  <li><strong>How often this happens in real work.</strong> These are ${nTasks} small tasks I wrote, mostly in Python. Four runs out of 100 is a rate on this suite, not on your codebase.</li>
+  <li><strong>Why it happens.</strong> The run records show what Codex did, not why it stopped. One CLI version, one model, one day.</li>
+  <li><strong>Cost.</strong> Claude Code reports a list-price estimate, which on a subscription is quota, not money billed. Codex CLI reports tokens only.</li>
+</ul>
+
+<h2 id="reproduce">Reproduce it</h2>
+<p>A free run with a simulated agent shows the whole pipeline and spends nothing:</p>
+<div class="cmd"><pre><code>uvx rerun-bench run --agent mock --runs 5</code></pre><button type="button" class="copy" data-copy hidden aria-label="Copy the mock run command">Copy</button></div>
+<p>This result set is one command per agent. They start real agent runs and spend your quota; drop <code>--yes</code> to see the run count and a cost estimate first.</p>
+<div class="cmd"><pre><code>uvx rerun-bench run --agent claude --model claude-opus-5-5 --runs 10 --yes
+uvx rerun-bench run --agent codex --model gpt-6-luna --runs 10 --yes
+uvx rerun-bench report results/</code></pre><button type="button" class="copy" data-copy hidden aria-label="Copy the commands for this result set">Copy</button></div>
+<p>Every run record, including the agent's final output, is in the <a href="${esc(srcDir)}">source directory</a>. The <a href="../../methodology/">methodology page</a> defines each metric.</p>
+
+<h2 id="next-run">What I am running next</h2>
+<p>A check for this exact failure: flag any run where the agent ends with a claim of having edited files while the workspace is unchanged, and report it as its own metric. Then more tasks, so the per-task numbers mean something. To suggest an agent or a task, open an issue on the <a href="${repro}">repository</a>.</p>
+</article>`;
+
+  return postLayout(
+    f,
+    `Result card for the ${r.date} result set: Claude Code ${pct(m.cc.pass_rate)} ${ci(m.cc.pass_rate_ci95)}, pass^${k} ${pct(m.cc.pass_hat_k)}, flip rate ${pct(m.cc.flip_rate)}; Codex CLI ${pct(m.cx.pass_rate)} ${ci(m.cx.pass_rate_ci95)}, pass^${k} ${pct(m.cx.pass_hat_k)}, flip rate ${pct(m.cx.flip_rate)}. The 95% intervals overlap.`,
+    body,
+  );
+}
+
 function findingsIndex() {
   const items = FINDINGS.slice()
     .sort((a, b) => b.published.localeCompare(a.published))
@@ -1183,7 +1358,7 @@ write("regressions/index.html", regressionsPage());
 write("launches/index.html", launchesPage());
 write("404.html", notFoundPage());
 write("findings/index.html", findingsIndex());
-for (const f of FINDINGS) write(`${findingUrl(f)}index.html`, pilotPost(f));
+for (const f of FINDINGS) write(`${findingUrl(f)}index.html`, f.render(f));
 write(".nojekyll", "");
 
 const copyDir = (from, to) => {

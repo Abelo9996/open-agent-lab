@@ -16,7 +16,9 @@ const out = join(root, outRel);
 const SITE_URL = "https://abelo9996.github.io/open-agent-lab/";
 const POST = "findings/2026-10-rerun-pilot/index.html";
 const POST_TITLE = "Same task, 3 runs: Codex passed and failed on 2 of 10 tasks, Claude Code on 0";
-const PAGES = ["index.html", "results/index.html", "methodology/index.html", "regressions/index.html", "launches/index.html", "404.html", "findings/index.html", POST];
+const POST2 = "findings/2026-10-rerun-10x/index.html";
+const POST2_TITLE = "Same task, 10 runs: Codex CLI reported edits it never made in 3 of 100 runs";
+const PAGES = ["index.html", "results/index.html", "methodology/index.html", "regressions/index.html", "launches/index.html", "404.html", "findings/index.html", POST, POST2];
 const html = {};
 
 before(() => {
@@ -128,15 +130,17 @@ test("every page has Open Graph and Twitter tags with absolute URLs", () => {
 });
 
 test("headline numbers come with a plain-language reading", () => {
-  for (const p of ["index.html", "results/index.html"]) {
-    assert.match(html[p], /<strong>In plain words:<\/strong> Claude Code passed 30 of 30 runs and Codex CLI passed 28 of 30 runs: 10 tasks, each run 3 times/);
-    assert.match(html[p], /This is a pilot/);
-  }
+  // The home page shows the latest result set; the results page shows every set.
+  const latest = /<strong>In plain words:<\/strong> Claude Code passed 100 of 100 runs and Codex CLI passed 96 of 100 runs: 10 tasks, each run 10 times/;
+  for (const p of ["index.html", "results/index.html"]) assert.match(html[p], latest);
+  assert.match(html["results/index.html"], /<strong>In plain words:<\/strong> Claude Code passed 30 of 30 runs and Codex CLI passed 28 of 30 runs: 10 tasks, each run 3 times/);
+  assert.match(html["results/index.html"], /This is a pilot/);
+  assert.doesNotMatch(html["index.html"], /This is a pilot/);
   const home = html["index.html"];
   assert.match(home, /<dl class="key">/);
-  for (const term of ["pass rate [low, high]", "pass^3", "flip rate", "median tokens"]) assert.ok(home.includes(`<dt>${term}</dt>`), term);
+  for (const term of ["pass rate [low, high]", "pass^10", "flip rate", "median tokens"]) assert.ok(home.includes(`<dt>${term}</dt>`), term);
   // The hero interval reads as a range, not as a second pass rate.
-  assert.match(home, /95% interval: 89% to 100%/);
+  assert.match(home, /95% interval: 96% to 100%/);
   assert.doesNotMatch(home, /class="hg-ci">95% \[/);
 });
 
@@ -216,8 +220,46 @@ test("the findings post is 600 to 900 words of prose and says what the pilot can
   assert.doesNotMatch(p, /\b(best|winner|beats|groundbreaking|revolutionary)\b/i);
 });
 
-test("the findings post is linked from the home page, the results page and the findings index", () => {
-  assert.match(html["index.html"], /href="findings\/2026-10-rerun-pilot\/"/);
-  assert.match(html["results/index.html"], /href="\.\.\/findings\/2026-10-rerun-pilot\/"/);
-  assert.match(html["findings/index.html"], /href="2026-10-rerun-pilot\/"/);
+test("each findings post is linked from the results page and the findings index, the latest from the home page", () => {
+  assert.match(html["index.html"], /href="findings\/2026-10-rerun-10x\/"/);
+  for (const slug of ["2026-10-rerun-pilot", "2026-10-rerun-10x"]) {
+    assert.match(html["results/index.html"], new RegExp(`href="\\.\\./findings/${slug}/"`));
+    assert.match(html["findings/index.html"], new RegExp(`href="${slug}/"`));
+  }
+});
+
+test("the 10-run post stands on its own: title, canonical URL and a dedicated share card", () => {
+  const p = html[POST2];
+  const url = `${SITE_URL}findings/2026-10-rerun-10x/`;
+  assert.ok(p.includes(`<title>${POST2_TITLE}</title>`));
+  assert.ok(p.includes(`<h1 id="post-title">${POST2_TITLE}</h1>`));
+  assert.ok(POST2_TITLE.length <= 80, "Hacker News titles are capped at 80 characters");
+  assert.ok(p.includes(`<link rel="canonical" href="${url}">`));
+  const img = `${SITE_URL}assets/findings/2026-10-rerun-10x.png`;
+  assert.ok(p.includes(`<meta property="og:image" content="${img}">`));
+  const png = readFileSync(join(out, "assets", "findings", "2026-10-rerun-10x.png"));
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.equal(png.readUInt32BE(20), 630);
+  const ld = JSON.parse(p.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)[1]);
+  assert.equal(ld.headline, POST2_TITLE);
+  assert.equal(ld.mainEntityOfPage, url);
+});
+
+test("the 10-run post is 600 to 950 words, names every failure and says what it cannot show", () => {
+  let a = html[POST2].slice(html[POST2].indexOf("<article"), html[POST2].indexOf("</article>"));
+  for (const re of [/<figure[\s\S]*?<\/figure>/g, /<div class="tablewrap">[\s\S]*?<\/div>/g, /<div class="cmd">[\s\S]*?<\/div>/g]) a = a.replace(re, "");
+  const words = a.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  assert.ok(words >= 600 && words <= 950, `${words} words`);
+  const p = html[POST2];
+  for (const id of ["setup", "numbers", "failures", "why", "default-model", "limits", "reproduce", "next-run"]) assert.ok(ids(p).has(id), id);
+  assert.match(p, /Claude Code 2\.1\.292, pinned to <code>claude-opus-5-5<\/code>/);
+  assert.match(p, /Codex CLI 0\.160\.0 with <code>gpt-6-luna<\/code>/);
+  assert.match(p, /96% to 100% for Claude Code and 90% to 98% for Codex CLI, and they overlap/);
+  for (const [task, run] of [["add-cli-flag", 5], ["refactor-extract-helper", 7], ["refactor-extract-helper", 9], ["implement-slugify", 7]]) {
+    assert.match(p, new RegExp(`<code>${task}</code></th><td class="num">${run}</td>`));
+  }
+  assert.match(p, /about 65% of the time/);
+  assert.match(p, /<code>claude-opus-4-8<\/code>/);
+  assert.match(p, /href="\.\.\/2026-10-rerun-pilot\/"/);
+  assert.doesNotMatch(p, /\b(best|winner|beats|groundbreaking|revolutionary)\b/i);
 });

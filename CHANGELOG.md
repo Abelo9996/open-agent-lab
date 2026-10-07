@@ -4,6 +4,13 @@ All notable changes to this project are listed here. Dates are UTC.
 
 ## Unreleased
 
+- Results: the 2026-10-06 result set, Claude Code (pinned to `claude-opus-5-5`) and Codex CLI on
+  10 tasks x 10 runs. Findings: a write-up at `/findings/2026-10-rerun-10x/` ("Same task, 10
+  runs: Codex CLI reported edits it never made in 3 of 100 runs"), with its own share card. The
+  build checks the title and the failure list against the result file.
+- The pass/fail grid shows one table per agent when the agents have more than 12 run columns
+  between them, so no run scrolls out of view. The home page hero stacks its text above the
+  run panel for the same reason.
 - Findings: a write-up of the 2026-10-03 pilot at `/findings/2026-10-rerun-pilot/` ("Same task,
   3 runs: Codex passed and failed on 2 of 10 tasks, Claude Code on 0"), with its own canonical
   URL, article metadata and a 1200x630 share card, and a `/findings/` index. The post's numbers

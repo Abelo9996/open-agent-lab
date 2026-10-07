@@ -215,6 +215,20 @@ export function rangeChart({ id, title, desc, series, rows, fmt = compact, unit 
 // Pass/fail per run. It is already a table, so it is its own table view.
 export function consistencyGrid({ id, title, desc, tasks, agents }) {
   // agents: [{ label, runs: n, perTask: { [taskId]: outcomes[] } }]
+  // Side by side, more than about 12 run columns no longer fit the content width
+  // and the last runs scroll out of view, so larger sets get one table per agent.
+  const stacked = agents.reduce((n, a) => n + a.runs, 0) > 12;
+  const tables = (stacked ? agents.map((a) => [a]) : [agents]).map((group) => gridTable(title, tasks, group, stacked));
+  return `<figure class="chart" id="${esc(id)}" aria-labelledby="${esc(id)}-t">
+  <figcaption><span class="ctitle" id="${esc(id)}-t">${esc(title)}</span>${desc ? `<span class="cdesc">${esc(desc)}</span>` : ""}</figcaption>
+  <ul class="legend" aria-label="Legend"><li><span class="run-mark pass" aria-hidden="true">&#10003;</span>pass (verifier exited 0)</li><li><span class="run-mark fail" aria-hidden="true">&#10005;</span>fail</li></ul>
+  ${tables.join("\n  ")}
+</figure>`;
+}
+
+// Each table is its own keyboard group: one tab stop, arrow keys inside.
+function gridTable(title, tasks, agents, stacked) {
+  let marks = 0;
   const head1 = agents
     .map((a) => `<th scope="colgroup" colspan="${a.runs}" class="ag">${esc(a.label)}</th><td class="rate"></td>`)
     .join("");
@@ -225,7 +239,6 @@ export function consistencyGrid({ id, title, desc, tasks, agents }) {
         `<th scope="col" class="run rate">rate</th>`,
     )
     .join("");
-  let marks = 0;
   const body = tasks
     .map((t) => {
       const cells = agents
@@ -245,13 +258,10 @@ export function consistencyGrid({ id, title, desc, tasks, agents }) {
       return `<tr><th scope="row"><span class="mono">${esc(t.id)}</span></th>${cells}</tr>`;
     })
     .join("\n");
-  return `<figure class="chart" id="${esc(id)}" aria-labelledby="${esc(id)}-t">
-  <figcaption><span class="ctitle" id="${esc(id)}-t">${esc(title)}</span>${desc ? `<span class="cdesc">${esc(desc)}</span>` : ""}</figcaption>
-  <ul class="legend" aria-label="Legend"><li><span class="run-mark pass" aria-hidden="true">&#10003;</span>pass (verifier exited 0)</li><li><span class="run-mark fail" aria-hidden="true">&#10005;</span>fail</li></ul>
-  <div class="tablewrap"><table class="grid-table" data-rove>
-    <caption class="sr-only">${esc(title)}</caption>
+  const caption = stacked ? `${title}: ${agents[0].label}` : title;
+  return `<div class="tablewrap${stacked ? " grid-stacked" : ""}"><table class="grid-table" data-rove>
+    <caption class="sr-only">${esc(caption)}</caption>
     <thead><tr><td></td>${head1}</tr><tr><th scope="col" class="task">Task</th>${head2}</tr></thead>
     <tbody>${body}</tbody>
-  </table></div>
-</figure>`;
+  </table></div>`;
 }

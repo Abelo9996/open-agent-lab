@@ -501,6 +501,9 @@ section {
   .hero {
     grid-template-columns: minmax(0, 1fr) auto;
   }
+  .hero.hero-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .hero h1 {
   max-width: 18ch;
@@ -2058,4 +2061,7 @@ ul.facts li::before {
     font-size: 0.8rem;
     white-space: normal;
   }
+}
+.grid-stacked + .grid-stacked {
+  margin-top: 1rem;
 }
