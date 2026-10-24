@@ -1,5 +1,12 @@
 # open agent lab
 
+> **The lab moved.** The site, result sets and findings now live with the engine in
+> [rerun-bench](https://github.com/Abelo9996/rerun-bench) and are published at
+> [abelo9996.github.io/rerun-bench](https://abelo9996.github.io/rerun-bench/). This repo stays active for two things:
+> the plugin marketplace (`/plugin marketplace add Abelo9996/open-agent-lab`) and the regression watch issues that
+> `nerf-watch share` opens.
+
+
 [![ci](https://github.com/Abelo9996/open-agent-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Abelo9996/open-agent-lab/actions/workflows/ci.yml) [![pages](https://github.com/Abelo9996/open-agent-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/Abelo9996/open-agent-lab/actions/workflows/pages.yml)
 
 <picture>

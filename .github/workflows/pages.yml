@@ -32,14 +32,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Validate data files
-        run: node scripts/validate.mjs
-      - name: Build the site
-        run: node scripts/build.mjs
+      # The lab site moved to rerun-bench (https://abelo9996.github.io/rerun-bench/). This repo keeps the
+      # plugin marketplace and the regression-report issues; its Pages site only redirects old links.
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: redirect
 
   deploy:
     needs: build
