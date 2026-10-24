@@ -88,9 +88,11 @@ factual: no claims beyond what the numbers show.
 
 ### How reports are aggregated
 
-The `regressions` workflow (`.github/workflows/regressions.yml`) runs daily, on manual
-dispatch, and whenever an issue with the `regression-report` label is opened, edited,
-closed, reopened, deleted or relabeled. It:
+Reports are filed here, but aggregated in rerun-bench: its `pages` workflow reads the open
+issues with the `regression-report` label every hour and on every push, and publishes the
+result at https://abelo9996.github.io/rerun-bench/regressions/. The current rules are in
+[rerun-bench's site/CONTRIBUTING.md](https://github.com/Abelo9996/rerun-bench/blob/main/site/CONTRIBUTING.md#how-reports-are-aggregated).
+At the move, the aggregator:
 
 1. reads open issues with that label through the GitHub API, with a read-only issues token;
 2. takes the first JSON code block in each body and validates it strictly
@@ -102,10 +104,10 @@ closed, reopened, deleted or relabeled. It:
    signal, and counts independent reports as distinct GitHub accounts (one account's newest
    issue per row). Each row has the median effect size, the dates the change was seen, and
    links to the source issues;
-4. writes `aggregates` in `data/regressions.json`, commits only if it changed, and the pages
-   workflow publishes it.
+4. writes `aggregates` into `data/regressions.json` for that build, and the rerun-bench site
+   publishes it.
 
-Closing an issue, or removing its label, removes it at the next run. Run the aggregator
+Closing an issue, or removing its label, removes it within the hour. Run the aggregator
 locally against saved API output with
 `node scripts/aggregate-regressions.mjs --issues issues.json --out /tmp/regressions.json`.
 

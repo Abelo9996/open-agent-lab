@@ -4,7 +4,8 @@
 > [rerun-bench](https://github.com/Abelo9996/rerun-bench) and are published at
 > [abelo9996.github.io/rerun-bench](https://abelo9996.github.io/rerun-bench/). This repo stays active for two things:
 > the plugin marketplace (`/plugin marketplace add Abelo9996/open-agent-lab`) and the regression watch issues that
-> `nerf-watch share` opens.
+> `nerf-watch share` opens. rerun-bench's site build reads those issues every hour and publishes the
+> [regression watch](https://abelo9996.github.io/rerun-bench/regressions/); nothing here aggregates them any more.
 
 
 [![ci](https://github.com/Abelo9996/open-agent-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Abelo9996/open-agent-lab/actions/workflows/ci.yml) [![pages](https://github.com/Abelo9996/open-agent-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/Abelo9996/open-agent-lab/actions/workflows/pages.yml)
@@ -30,13 +31,13 @@ JSON file under [`data/`](data/).
 | Path | What it is |
 |---|---|
 | `data/results/<YYYY-MM-DD>-<label>.json` | One result set each: a rerun-bench JSON report, optionally with a `lab` block of metadata. |
-| `data/regressions.json` | Regression watch data: `aggregates`, written by the `regressions` workflow from open regression-report issues, and hand-reviewed `reports`. |
+| `data/regressions.json` | Frozen copy from before the move. The live regression watch data is built in rerun-bench. |
 | `data/launches.json` | Launch-day log: model launches and the result sets published for them. |
 | `data/agents.json` | Display names and links for agent ids used in result files. |
 | `data/tasks.json` | The task suite (ids, titles, tags, timeouts), copied from rerun-bench. |
 | `scripts/build.mjs` | Builds `_site/` from `data/`. No dependencies. |
 | `scripts/validate.mjs` | Validates every data file. CI runs it on every pull request. |
-| `scripts/aggregate-regressions.mjs` | Validates and aggregates regression-report issues into `data/regressions.json`. Runs daily in `.github/workflows/regressions.yml`. |
+| `scripts/aggregate-regressions.mjs` | Validates and aggregates regression-report issues. The copy in rerun-bench (`site/scripts/`) is the one that runs. |
 | `src/` | Stylesheet, the page script (tooltips, theme, copy buttons, demo playback, chart entrance), the favicon, the tool demo recordings and still frames, and the social preview image, copied to `_site/assets/`. |
 | `scripts/social.mjs` | Renders `src/social-preview.png` (and `docs/social-preview.png`) from the latest result set with headless Chrome. |
 
